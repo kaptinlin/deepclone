@@ -104,18 +104,6 @@ Performance comparison for Go deep clone libraries.
 | | huandu | 6,079 | 81,968 | 3 |
 | | golang-design | 229,766 | 162,001 | 10,004 |
 
-## Performance Summary
-
-### Performance Characteristics by Library
-
-| Library | Strengths | Use Cases |
-|---------|-----------|-----------|
-| **this** | Zero-allocation primitives, efficient large data handling | High-performance applications requiring minimal allocations |
-| **mohae** | Simple API, broad compatibility | General-purpose copying where performance is not critical |
-| **jinzhu** | Field mapping, cross-type copying, struct tags support | Data transformation and mapping between different struct types |
-| **huandu** | Excellent struct performance, minimal allocations | High-frequency struct cloning with good performance requirements |
-| **golang-design** | Experimental features, comprehensive type support | Research and experimental applications |
-
 ## Usage
 
 ```bash
