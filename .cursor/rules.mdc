@@ -1,0 +1,318 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# DeepClone Library Development Rules
+
+## Project Overview
+
+This is a high-performance Go deep cloning library with zero dependencies, supporting all Go types with circular reference detection and custom cloning interfaces. The library is performance-optimized and mature, now focusing on stability and maintainability.
+
+## Development Standards
+
+### Code Quality
+- **Simplicity over complexity**: Prefer readable, maintainable code over micro-optimizations
+- **Performance-driven**: All optimizations must be benchmarked (>10% improvement required)
+- **Zero dependencies**: Keep the library self-contained
+- **Comprehensive testing**: Every feature must have thorough tests with edge cases
+- **Lint compliance**: All code must pass golangci-lint checks
+
+### Performance Guidelines
+- **Measure everything**: No optimization without benchmarks
+- **Revert ineffective changes**: <10% improvement = immediate rollback
+- **Fast paths for common cases**: Optimize the 80% use cases
+- **Avoid over-engineering**: Built-in Go optimizations are excellent
+- **Current status**: Performance targets achieved - focus on maintainability
+
+### Git Workflow
+- **Conventional Commits**: Use `feat:`, `fix:`, `docs:`, `refactor:`, etc.
+- **English only**: All commit messages, code comments, and documentation
+- **Small, focused commits**: One feature/fix per commit
+- **Branch naming**: `feature/description`, `fix/issue-description`
+
+## File Structure
+
+```
+deepclone/
+├── clone.go                 # Core cloning implementation
+├── types.go                 # Interfaces (Cloneable)
+├── doc.go                   # Package documentation
+├── clone_test.go            # Comprehensive test suite
+├── go.mod                   # Module definition
+├── go.sum                   # Dependency checksums
+├── README.md                # Project documentation
+├── LICENSE                  # MIT license
+├── Makefile                 # Build and test automation
+├── .gitignore              # Git ignore rules
+├── .golangci.yml           # Linter configuration
+├── .golangci.version       # Linter version specification
+├── .editorconfig           # Editor configuration
+├── .gitattributes          # Git file attributes
+├── benchmarks/             # Performance benchmarks
+│   ├── README.md           # Benchmark documentation
+│   ├── benchmark_test.go   # Comparison benchmarks
+│   ├── benchmark_results.txt # Latest results
+│   └── run_benchmarks.sh   # Automated benchmark script
+├── examples/               # Usage examples
+│   ├── README.md           # Examples documentation
+│   ├── basic/              # Simple use cases
+│   ├── circular/           # Circular reference examples
+│   └── custom/             # Custom Cloneable examples
+├── .github/                # GitHub workflows and templates
+└── bin/                    # Build tools (gitignored)
+```
+
+## Development Workflow
+
+### Before Making Changes
+1. Run tests: `make test`
+2. Run linting: `make lint`
+3. Run baseline benchmarks: `make bench-comparison`
+4. Review existing implementation for opportunities
+
+### Making Changes
+1. Implement feature/optimization
+2. Add comprehensive tests
+3. Ensure linting passes: `make lint`
+4. Run benchmarks to measure impact
+5. If <10% improvement: revert immediately
+6. Update documentation if API changes
+
+### Quality Gates
+- All tests must pass: `make test`
+- No linting errors: `make lint`
+- No performance regressions
+- Code coverage maintained
+- Clean, readable code
+- No new dependencies
+
+### Available Make Targets
+```bash
+make help          # Show available targets
+make test          # Run all tests
+make lint          # Run linting
+make bench         # Run benchmarks
+make bench-comparison # Run comparison benchmarks
+make verify        # Run all verification steps
+make clean         # Clean build artifacts
+```
+
+## Optimization Lessons Learned
+
+### What Works ✅
+- **Type switches before reflection**: 40x improvement for primitives
+- **Zero allocation paths**: Achieved for primitive types
+- **Built-in functions**: `copy()`, `make()` are highly optimized
+- **Simple caching**: Field type decision caching
+- **Fast paths for common cases**: Small struct optimization
+
+### What Doesn't Work ❌
+- **sync.Pool for small objects**: Overhead > savings
+- **Map pre-sizing**: Go's map implementation already optimal
+- **Empty collection fast paths**: Built-ins handle this well
+- **Complex reflection optimizations**: Often unstable
+
+### Best Practices
+- Benchmark before and after every change
+- Prefer built-in functions over manual implementations
+- Cache decisions, not objects
+- Keep fast paths simple and obvious
+- Revert immediately if improvement <10%
+
+## Testing Standards
+
+### Test Categories
+1. **Unit tests**: All public functions
+2. **Edge cases**: Nil values, empty collections, circular references
+3. **Integration tests**: Complex nested structures
+4. **Performance tests**: Regression prevention
+5. **Interface tests**: Custom Cloneable implementations
+6. **Linting tests**: Code quality enforcement
+
+### Test Naming
+```go
+func TestClone<Type><Scenario>(t *testing.T) {
+    t.Run("descriptive_case", func(t *testing.T) {
+        // Test implementation
+    })
+}
+```
+
+### Benchmark Naming
+```go
+func BenchmarkClone<Type>(b *testing.B) {
+    // Benchmark implementation
+}
+```
+
+## Documentation Standards
+
+### Code Comments
+- Public functions must have Go doc comments
+- Complex algorithms need implementation comments
+- Performance-critical sections should explain optimization choices
+- All exported types and constants must be documented
+
+### Examples
+- Each major feature needs a runnable example
+- Examples should demonstrate real-world usage
+- Include performance comparisons where relevant
+- Examples are organized in the `examples/` directory
+
+## API Design Principles
+
+### Core API
+```go
+// Primary API - Simple and intuitive
+func Clone[T any](mdc:src T) T
+
+// Extension interface for custom deep cloning
+type Cloneable interface {
+    Clone() any
+}
+```
+
+### Design Guidelines
+- **Generic-first**: Use generics over `interface{}`
+- **Zero dependencies**: Only standard library
+- **Backward compatibility**: Maintain API stability
+- **Thread-safe**: All operations should be concurrent-safe
+- **Deep cloning by default**: All cloning operations perform deep copies
+
+## Code Style Guidelines
+
+### Go Standards
+- Follow official `go fmt` formatting
+- Use `goimports` for import management
+- Comply with `golangci-lint` rules (all rules must pass)
+- CamelCase for exported functions
+- ALL_CAPS for package-level constants
+- Descriptive variable names
+
+### Error Handling
+- Use standard `error` interface
+- Minimize error checking in performance-critical paths
+- Prioritize performance over verbose error messages
+- Handle panics gracefully in reflection code
+
+### Memory Management
+- Minimize allocations in hot paths
+- Avoid memory leaks
+- Don't over-optimize at the expense of readability
+- Use circular reference detection to prevent infinite loops
+
+## Performance Optimization Rules
+
+### Effective Strategies (Proven Results)
+1. **Type switches before reflection** (40x improvement achieved)
+2. **Fast paths for primitives** (Zero allocation achieved)
+3. **Slice fast paths** (15x improvement achieved)
+4. **Struct field caching** (27% improvement achieved)
+5. **Optimized map cloning** (Efficient implementation)
+
+### Ineffective Strategies (Proven)
+1. **Context pooling** (sync.Pool overhead > benefits)
+2. **Map pre-allocation** (Go's implementation already optimal)
+3. **Empty collection optimizations** (Built-ins are excellent)
+4. **Complex reflection micro-optimizations** (Unstable results)
+
+### Optimization Process
+```bash
+# 1. Establish baseline
+make bench-comparison > before.txt
+
+# 2. Implement optimization
+# ... make changes ...
+
+# 3. Measure impact
+make bench-comparison > after.txt
+
+# 4. Compare results
+# If improvement < 10% or unstable: revert immediately
+```
+
+## Linting and Code Quality
+
+### Required Tools
+- golangci-lint (version specified in `.golangci.version`)
+- go fmt
+- go vet
+- goimports
+
+### Linting Rules
+- All linting rules must pass without warnings
+- Exhaustive switch statements required
+- No unused variables or imports
+- No duplicate code branches
+- Proper error handling
+
+### Code Quality Checks
+```bash
+make lint          # Run all linting
+make fmt           # Format code
+make vet           # Run go vet
+make verify        # Complete verification
+```
+
+## Maintenance Philosophy
+
+**The library is now performance-optimized and feature-complete.**
+
+### Current Status
+- Performance targets exceeded across all data types
+- Zero dependencies maintained
+- Comprehensive test coverage achieved
+- All linting rules passing
+- Stable API established
+
+### Future Development Focus
+1. **Correctness**: Fix bugs, handle edge cases
+2. **Compatibility**: Support new Go versions
+3. **Documentation**: Improve examples and guides
+4. **Maintenance**: Keep dependencies updated
+
+### What NOT to Do
+- **Avoid premature optimization**: Current performance is excellent
+- **Don't add dependencies**: Keep the library lightweight
+- **Don't break API**: Maintain backward compatibility
+- **Don't micro-optimize**: Focus on maintainability
+- **Don't ignore linting**: All rules must pass
+
+## Security Considerations
+
+### Memory Safety
+- Avoid unsafe operations unless absolutely necessary
+- Thoroughly test pointer operations
+- Handle circular references correctly
+- Prevent memory leaks in complex structures
+
+### Concurrent Safety
+- All public APIs must be thread-safe
+- Use appropriate synchronization primitives
+- Avoid race conditions in caching mechanisms
+- Test concurrent access patterns
+
+## Repository Structure Guidelines
+
+### Documentation Organization
+- **Root README.md**: Project overview and quick start
+- **benchmarks/README.md**: Performance analysis and comparisons
+- **examples/README.md**: Usage examples and tutorials
+- **doc.go**: Package-level documentation
+
+### File Organization
+- Keep core implementation in root directory
+- Separate concerns into appropriate subdirectories
+- Maintain clean import paths
+- Use descriptive file names
+
+### Dependency Management
+- No external dependencies allowed
+- Use only Go standard library
+- Keep go.mod minimal and clean
+- Regular `go mod tidy` to maintain go.sum
+
+---
+
+**Remember**: This library prioritizes performance while maintaining simplicity and correctness. The optimization phase is complete - focus on stability, maintainability, and correctness over further performance tweaks.
