@@ -1,15 +1,16 @@
 name: Go CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+  workflow_dispatch:
     steps:
     - name: Check out repository
       uses: actions/checkout@v5
@@ -20,7 +21,6 @@ jobs:
         go-version-file: go.mod
         cache: true
 
-    - name: Download dependencies
       run: make deps
 
     - name: Run linters
