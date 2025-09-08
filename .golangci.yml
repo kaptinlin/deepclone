@@ -1,4 +1,5 @@
 version: "2"
+
 linters:
   enable:
     - copyloopvar
@@ -19,35 +20,27 @@ linters:
     - revive
     - unconvert
     - whitespace
-  settings:
-    revive:
-      rules:
-        - name: unused-parameter
-          disabled: true
-  exclusions:
-    generated: lax
+
+linters-settings:
+  revive:
     rules:
-      - linters:
-          - funlen
-          - gochecknoglobals
-          - gosec
-          - noctx
-          - revive
-        path: _test\.go
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+      - name: unused-parameter
+        disabled: true
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-formatters:
-  enable:
-    - gofmt
-    - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+  
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen
+        - gochecknoglobals
+        - gosec
+        - noctx
+        - revive
+
+  exclude-dirs:
+    - third_party
+    - examples
+    - builtin

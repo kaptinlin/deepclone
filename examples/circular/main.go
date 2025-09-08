@@ -1,3 +1,4 @@
+// Package main demonstrates handling circular references with the deepclone library.
 package main
 
 import (
