@@ -10,7 +10,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-  workflow_dispatch:
     steps:
     - name: Check out repository
       uses: actions/checkout@v5
@@ -19,8 +18,8 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
-        cache: true
 
+    - name: Install dependencies
       run: make deps
 
     - name: Run linters

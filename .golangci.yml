@@ -21,26 +21,27 @@ linters:
     - unconvert
     - whitespace
 
-linters-settings:
-  revive:
+  settings:
+    revive:
+      rules:
+        - name: unused-parameter
+          disabled: true
+
+  exclusions:
+    paths:
+      - third_party
+      - examples
+      - builtin
+    
     rules:
-      - name: unused-parameter
-        disabled: true
+      - path: _test\.go
+        linters:
+          - funlen
+          - gochecknoglobals
+          - gosec
+          - noctx
+          - revive
 
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-  
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - funlen
-        - gochecknoglobals
-        - gosec
-        - noctx
-        - revive
-
-  exclude-dirs:
-    - third_party
-    - examples
-    - builtin
