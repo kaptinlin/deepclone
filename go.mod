@@ -1,6 +1,6 @@
 module github.com/kaptinlin/deepclone
 
-go 1.21
+go 1.24.7
 
 require (
 	github.com/huandu/go-clone v1.7.3
