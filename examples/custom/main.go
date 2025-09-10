@@ -1,3 +1,4 @@
+// Package main demonstrates custom cloning behavior with the deepclone library.
 package main
 
 import (

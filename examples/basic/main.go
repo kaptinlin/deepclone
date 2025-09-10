@@ -1,3 +1,4 @@
+// Package main demonstrates basic usage of the deepclone library.
 package main
 
 import (
