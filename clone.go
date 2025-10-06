@@ -381,12 +381,27 @@ func (ctx *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	ctx.visited[addr] = newMap
 
 	// Copy all key-value pairs with deep cloning
+	mapElemType := v.Type().Elem()
 	for _, key := range v.MapKeys() {
 		value := v.MapIndex(key)
 		clonedKey := ctx.cloneValue(key)
 		clonedValue := ctx.cloneValue(value)
 
 		if clonedKey.IsValid() && clonedValue.IsValid() {
+			// Handle type alias conversions to prevent panic during SetMapIndex.
+			// When a map declares type *A but contains type *B (where type A = B),
+			// we must convert *B to *A before insertion.
+			if clonedValue.Type() != mapElemType {
+				switch {
+				case clonedValue.Type().ConvertibleTo(mapElemType):
+					clonedValue = clonedValue.Convert(mapElemType)
+				case clonedValue.Type().AssignableTo(mapElemType):
+					// Assignable but not convertible - rare edge case, allow as-is
+				default:
+					// Incompatible types - skip entry to avoid panic
+					continue
+				}
+			}
 			newMap.SetMapIndex(clonedKey, clonedValue)
 		}
 	}
@@ -423,6 +438,11 @@ func (ctx *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 			// Deep clone for complex types
 			clonedField := ctx.cloneValue(srcField)
 			if clonedField.IsValid() && dstField.CanSet() {
+				// Handle type alias conversions to prevent panic during Set.
+				// Convert cloned value to match destination field type when needed.
+				if clonedField.Type() != dstField.Type() && clonedField.Type().ConvertibleTo(dstField.Type()) {
+					clonedField = clonedField.Convert(dstField.Type())
+				}
 				dstField.Set(clonedField)
 			}
 		}

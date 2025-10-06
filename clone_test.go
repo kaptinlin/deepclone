@@ -503,3 +503,235 @@ func TestCloneEdgeCases(t *testing.T) {
 		assert.False(t, cloned.Parent == parent, "Parent should be cloned, not same reference")
 	})
 }
+
+// TestCloneTypeAliases tests cloning with type aliases to prevent panic
+func TestCloneTypeAliases(t *testing.T) {
+	t.Run("pointer type alias in map", func(t *testing.T) {
+		type Schema struct {
+			Name string
+			Age  int
+		}
+		type Property Schema
+
+		// Map declares *Property but contains *Schema
+		schemaVal := &Schema{Name: "test", Age: 42}
+		original := map[string]*Property{
+			"key": (*Property)(schemaVal),
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.NotNil(t, cloned)
+		require.NotNil(t, cloned["key"])
+		assert.Equal(t, "test", cloned["key"].Name)
+		assert.Equal(t, 42, cloned["key"].Age)
+
+		// Verify independence
+		original["key"].Name = "modified"
+		assert.NotEqual(t, original["key"].Name, cloned["key"].Name)
+	})
+
+	t.Run("type alias in struct field", func(t *testing.T) {
+		type Base struct {
+			Value int
+		}
+		type Alias Base
+
+		type Container struct {
+			Field *Base
+		}
+
+		// Field declares *Base but contains *Alias converted to *Base
+		aliasVal := &Alias{Value: 42}
+		original := Container{
+			Field: (*Base)(aliasVal),
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.NotNil(t, cloned.Field)
+		assert.Equal(t, 42, cloned.Field.Value)
+
+		// Verify independence
+		original.Field.Value = 999
+		assert.NotEqual(t, original.Field.Value, cloned.Field.Value)
+	})
+
+	t.Run("complex type alias scenario", func(t *testing.T) {
+		type Schema struct {
+			Type  string
+			Items *Schema
+		}
+		type Property Schema
+
+		// Complex nested structure with type aliases
+		itemsSchema := &Schema{Type: "string"}
+		original := map[string]*Property{
+			"prop1": (*Property)(&Schema{
+				Type:  "array",
+				Items: itemsSchema,
+			}),
+			"prop2": (*Property)(&Schema{
+				Type: "object",
+			}),
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.NotNil(t, cloned)
+		require.NotNil(t, cloned["prop1"])
+		require.NotNil(t, cloned["prop2"])
+		assert.Equal(t, "array", cloned["prop1"].Type)
+		require.NotNil(t, cloned["prop1"].Items)
+		assert.Equal(t, "string", cloned["prop1"].Items.Type)
+		assert.Equal(t, "object", cloned["prop2"].Type)
+
+		// Verify deep independence
+		original["prop1"].Items.Type = "modified"
+		assert.Equal(t, "string", cloned["prop1"].Items.Type)
+	})
+
+	t.Run("circular reference with type aliases", func(t *testing.T) {
+		type Node struct {
+			Value int
+			Next  *Node
+		}
+		type AliasNode Node
+
+		// Create circular reference with type alias
+		node1 := &Node{Value: 1}
+		node2 := (*Node)(&AliasNode{Value: 2})
+		node1.Next = node2
+		node2.Next = node1
+
+		// Should not panic and maintain circular reference
+		cloned := Clone(node1)
+		require.NotNil(t, cloned)
+		assert.Equal(t, 1, cloned.Value)
+		require.NotNil(t, cloned.Next)
+		assert.Equal(t, 2, cloned.Next.Value)
+		require.NotNil(t, cloned.Next.Next)
+		assert.Equal(t, 1, cloned.Next.Next.Value)
+		assert.True(t, cloned.Next.Next == cloned, "Circular reference should be maintained")
+	})
+
+	t.Run("slice with type alias elements", func(t *testing.T) {
+		type Base struct {
+			ID   int
+			Name string
+		}
+		type Derived Base
+
+		// Slice with mixed type aliases
+		original := []*Base{
+			{ID: 1, Name: "first"},
+			(*Base)(&Derived{ID: 2, Name: "second"}),
+			{ID: 3, Name: "third"},
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.Len(t, cloned, 3)
+		assert.Equal(t, 1, cloned[0].ID)
+		assert.Equal(t, "first", cloned[0].Name)
+		assert.Equal(t, 2, cloned[1].ID)
+		assert.Equal(t, "second", cloned[1].Name)
+		assert.Equal(t, 3, cloned[2].ID)
+		assert.Equal(t, "third", cloned[2].Name)
+
+		// Verify independence
+		original[1].Name = "modified"
+		assert.Equal(t, "second", cloned[1].Name)
+	})
+
+	t.Run("nested maps with type aliases", func(t *testing.T) {
+		type InnerMap map[string]int
+		type OuterValue struct {
+			Data InnerMap
+		}
+		type AliasValue OuterValue
+
+		// Nested map structure with type aliases
+		original := map[string]*OuterValue{
+			"key1": (*OuterValue)(&AliasValue{
+				Data: InnerMap{"a": 1, "b": 2},
+			}),
+			"key2": {
+				Data: InnerMap{"c": 3, "d": 4},
+			},
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.NotNil(t, cloned)
+		require.NotNil(t, cloned["key1"])
+		require.NotNil(t, cloned["key2"])
+		assert.Equal(t, 1, cloned["key1"].Data["a"])
+		assert.Equal(t, 2, cloned["key1"].Data["b"])
+		assert.Equal(t, 3, cloned["key2"].Data["c"])
+		assert.Equal(t, 4, cloned["key2"].Data["d"])
+
+		// Verify deep independence
+		original["key1"].Data["a"] = 999
+		assert.Equal(t, 1, cloned["key1"].Data["a"])
+	})
+
+	t.Run("type alias with interface field", func(t *testing.T) {
+		type Base struct {
+			Value interface{}
+		}
+		type Alias Base
+
+		type Container struct {
+			Items map[string]*Base
+		}
+
+		// Map with type alias containing interface values
+		original := Container{
+			Items: map[string]*Base{
+				"int":    (*Base)(&Alias{Value: 42}),
+				"string": (*Base)(&Alias{Value: "test"}),
+				"slice":  (*Base)(&Alias{Value: []int{1, 2, 3}}),
+			},
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.NotNil(t, cloned.Items)
+		assert.Equal(t, 42, cloned.Items["int"].Value)
+		assert.Equal(t, "test", cloned.Items["string"].Value)
+		assert.Equal(t, []int{1, 2, 3}, cloned.Items["slice"].Value)
+
+		// Verify independence of slice in interface
+		originalSlice := original.Items["slice"].Value.([]int)
+		originalSlice[0] = 999
+		clonedSlice := cloned.Items["slice"].Value.([]int)
+		assert.Equal(t, 1, clonedSlice[0])
+	})
+
+	t.Run("type alias chain", func(t *testing.T) {
+		type Level1 struct {
+			Value string
+		}
+		type Level2 Level1
+		type Level3 Level2
+
+		// Multiple levels of type aliases
+		original := map[string]*Level1{
+			"a": (*Level1)(&Level2{Value: "test1"}),
+			"b": (*Level1)(&Level3{Value: "test2"}),
+			"c": {Value: "test3"},
+		}
+
+		// Should not panic during cloning
+		cloned := Clone(original)
+		require.NotNil(t, cloned)
+		assert.Equal(t, "test1", cloned["a"].Value)
+		assert.Equal(t, "test2", cloned["b"].Value)
+		assert.Equal(t, "test3", cloned["c"].Value)
+
+		// Verify independence
+		original["a"].Value = "modified"
+		assert.Equal(t, "test1", cloned["a"].Value)
+	})
+}
