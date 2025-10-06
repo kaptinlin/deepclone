@@ -2,7 +2,7 @@
 
 A high-performance deep cloning library for Go that provides safe, efficient copying of any Go value.
 
-[![Go Version](https://img.shields.io/badge/go-%3E%3D1.21-blue)](https://golang.org/dl/)
+[![Go Version](https://img.shields.io/badge/go-%3E%3D1.25-blue)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/deepclone)](https://goreportcard.com/report/github.com/kaptinlin/deepclone)
 
@@ -122,12 +122,16 @@ DeepClone is optimized for performance with:
 
 ### Benchmark Results
 
-| Operation | Performance | Memory |
-|-----------|-------------|---------|
-| Primitives | 1.5 ns/op | 0 allocs |
-| Simple Collections | 69 ns/op | Minimal |
-| Complex Structs | 764 ns/op | Efficient |
-| Large Data | 3,654 ns/op | Optimized |
+Tested on Apple M3, macOS (darwin/arm64):
+
+| Operation | Performance | Memory | Allocations |
+|-----------|-------------|---------|-------------|
+| Primitives (int/string/bool) | 2.7-3.6 ns/op | 0 B/op | 0 allocs/op |
+| Slice (100 ints) | 200.6 ns/op | 896 B/op | 1 allocs/op |
+| Map (100 entries) | 4,299 ns/op | 3,544 B/op | 4 allocs/op |
+| Simple Struct | 248.6 ns/op | 128 B/op | 4 allocs/op |
+| Nested Struct | 1,386 ns/op | 952 B/op | 19 allocs/op |
+| Large Slice (10K ints) | 6,709 ns/op | 81,920 B/op | 1 allocs/op |
 
 For detailed benchmarks and comparisons with other libraries, see **[benchmarks/](benchmarks/)**.
 
@@ -174,7 +178,7 @@ We welcome contributions! Please feel free to:
 
 ## 📋 Requirements
 
-- Go 1.21 or later
+- Go 1.25 or later
 - No external dependencies
 
 ## 📄 License

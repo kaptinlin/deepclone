@@ -24,85 +24,85 @@ Performance comparison for Go deep clone libraries.
 | Type | Library | ns/op | B/op | allocs/op |
 |------|---------|-------|------|-----------|
 | **Int** | | | | |
-| | this | 1.47 | 0 | 0 |
-| | mohae | 37.29 | 16 | 2 |
-| | huandu | 10.10 | 0 | 0 |
-| | golang-design | 19.93 | 32 | 1 |
+| | this | 2.98 | 0 | 0 |
+| | mohae | 65.51 | 16 | 2 |
+| | huandu | 12.29 | 0 | 0 |
+| | golang-design | 32.76 | 32 | 1 |
 | **String** | | | | |
-| | this | 1.55 | 0 | 0 |
-| | mohae | 54.56 | 48 | 3 |
-| | huandu | 18.10 | 16 | 1 |
-| | golang-design | 51.47 | 80 | 4 |
+| | this | 2.66 | 0 | 0 |
+| | mohae | 95.27 | 48 | 3 |
+| | huandu | 31.87 | 16 | 1 |
+| | golang-design | 92.90 | 80 | 4 |
 | **Float64** | | | | |
-| | this | 1.46 | 0 | 0 |
-| | mohae | 42.61 | 24 | 3 |
-| | huandu | 13.85 | 8 | 1 |
-| | golang-design | 26.04 | 40 | 2 |
+| | this | 2.72 | 0 | 0 |
+| | mohae | 77.85 | 24 | 3 |
+| | huandu | 24.39 | 8 | 1 |
+| | golang-design | 60.31 | 40 | 2 |
 | **Bool** | | | | |
-| | this | 1.62 | 0 | 0 |
-| | mohae | 34.44 | 2 | 2 |
-| | huandu | 6.96 | 0 | 0 |
-| | golang-design | 19.12 | 32 | 1 |
+| | this | 3.62 | 0 | 0 |
+| | mohae | 78.05 | 2 | 2 |
+| | huandu | 15.67 | 0 | 0 |
+| | golang-design | 52.80 | 32 | 1 |
 
 ### Collections
 
 | Collection | Library | ns/op | B/op | allocs/op |
 |------------|---------|-------|------|-----------|
 | **Slice (100 ints)** | | | | |
-| | this | 69.41 | 896 | 1 |
-| | mohae | 2334 | 1792 | 105 |
-| | huandu | 118.1 | 944 | 3 |
-| | golang-design | 2381 | 1776 | 104 |
+| | this | 200.6 | 896 | 1 |
+| | mohae | 5,301 | 1,792 | 105 |
+| | huandu | 330.2 | 944 | 3 |
+| | golang-design | 4,840 | 1,776 | 104 |
 | **Map (100 entries)** | | | | |
-| | this | 1636 | 3544 | 4 |
-| | mohae | 14772 | 16048 | 513 |
-| | huandu | 5961 | 5944 | 204 |
-| | golang-design | 8129 | 8376 | 405 |
+| | this | 4,299 | 3,544 | 4 |
+| | mohae | 39,568 | 16,048 | 513 |
+| | huandu | 12,212 | 5,944 | 204 |
+| | golang-design | 21,517 | 8,376 | 405 |
 
 ### Complex Structures
 
 | Structure | Library | ns/op | B/op | allocs/op |
 |-----------|---------|-------|------|-----------|
 | **Simple Struct** | | | | |
-| | this | 194 | 160 | 5 |
-| | mohae | 138 | 96 | 3 |
-| | jinzhu | 908 | 456 | 15 |
-| | huandu | 85.5 | 96 | 3 |
-| | golang-design | 160 | 148 | 6 |
+| | this | 248.6 | 128 | 4 |
+| | mohae | 227.3 | 96 | 3 |
+| | jinzhu | 1,642 | 456 | 15 |
+| | huandu | 178.5 | 96 | 3 |
+| | golang-design | 325.4 | 148 | 6 |
 | **Nested Struct** | | | | |
-| | this | 764 | 952 | 19 |
-| | mohae | 1144 | 1176 | 35 |
-| | jinzhu | 4287 | 2336 | 68 |
-| | huandu | 693 | 776 | 16 |
-| | golang-design | 1259 | 1280 | 45 |
+| | this | 1,386 | 952 | 19 |
+| | mohae | 2,143 | 1,176 | 35 |
+| | jinzhu | 6,660 | 2,336 | 68 |
+| | huandu | 1,059 | 776 | 16 |
+| | golang-design | 2,465 | 1,280 | 45 |
 
 ### Special Cases
 
 | Case | Library | ns/op | B/op | allocs/op |
 |------|---------|-------|------|-----------|
 | **Pointers** | | | | |
-| | this | 117 | 64 | 2 |
-| | mohae | 210 | 136 | 7 |
-| | huandu | 71.6 | 32 | 1 |
-| | golang-design | 218 | 180 | 7 |
+| | this | 200.8 | 64 | 2 |
+| | mohae | 343.4 | 136 | 7 |
+| | huandu | 181.3 | 32 | 1 |
+| | golang-design | 446.1 | 180 | 7 |
 | **Circular Reference** | | | | |
-| | this | 122 | 64 | 2 |
-| | golang-design | 216 | 184 | 7 |
+| | this | 212.3 | 64 | 2 |
+| | golang-design | 411.1 | 184 | 7 |
 | **Interface** | | | | |
-| | this | 157 | 64 | 2 |
-| | mohae | 142 | 64 | 2 |
-| | huandu | 72.2 | 64 | 2 |
-| | golang-design | 146 | 116 | 5 |
+| | this | 190.9 | 64 | 2 |
+| | mohae | 200.1 | 64 | 2 |
+| | huandu | 135.5 | 64 | 2 |
+| | golang-design | 347.8 | 116 | 5 |
 
 ### Large Data Performance
 
 | Test | Library | ns/op | B/op | allocs/op |
 |------|---------|-------|------|-----------|
 | **Large Slice (10K ints)** | | | | |
-| | this | 3,654 | 81,920 | 1 |
-| | mohae | 221,200 | 162,017 | 10,005 |
-| | huandu | 6,079 | 81,968 | 3 |
-| | golang-design | 229,766 | 162,001 | 10,004 |
+| | this | 6,709 | 81,920 | 1 |
+| | mohae | 404,820 | 162,017 | 10,005 |
+| | huandu | 12,002 | 81,968 | 3 |
+| | golang-design | 395,634 | 162,001 | 10,004 |
 
 ## Usage
 
