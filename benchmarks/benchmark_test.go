@@ -1,7 +1,7 @@
 package benchmarks
 
 import (
-	"encoding/json"
+	"github.com/go-json-experiment/json"
 	"reflect"
 	"testing"
 
@@ -186,6 +186,7 @@ func BenchmarkBool_GolangDesign(b *testing.B) {
 
 // Benchmark: Slice (100 ints)
 func BenchmarkSlice100_This(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = deepclone.Clone(testSlice)
 	}
@@ -211,6 +212,7 @@ func BenchmarkSlice100_GolangDesign(b *testing.B) {
 
 // Benchmark: Map (100 entries)
 func BenchmarkMap100_This(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = deepclone.Clone(testMap)
 	}
@@ -236,6 +238,7 @@ func BenchmarkMap100_GolangDesign(b *testing.B) {
 
 // Benchmark: Simple Struct
 func BenchmarkSimpleStruct_This(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = deepclone.Clone(testSimple)
 	}
@@ -268,6 +271,7 @@ func BenchmarkSimpleStruct_GolangDesign(b *testing.B) {
 
 // Benchmark: Nested Struct
 func BenchmarkNestedStruct_This(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = deepclone.Clone(testNested)
 	}
@@ -389,6 +393,7 @@ func BenchmarkLargeSlice_This(b *testing.B) {
 	for i := range largeSlice {
 		largeSlice[i] = i
 	}
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = deepclone.Clone(largeSlice)

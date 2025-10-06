@@ -13,7 +13,7 @@ type cloneContext struct {
 // newCloneContext creates a new cloning context
 func newCloneContext() *cloneContext {
 	return &cloneContext{
-		visited: make(map[uintptr]reflect.Value),
+		visited: make(map[uintptr]reflect.Value, 8), // Pre-allocate for common cases
 	}
 }
 
@@ -225,34 +225,8 @@ func Clone[T any](src T) T {
 		}
 	}
 
-	// Fast path for small structs (≤4 fields) with basic types only
-	if v.Kind() == reflect.Struct {
-		t := v.Type()
-		numFields := t.NumField()
-
-		// Only optimize small structs with simple field types
-		if numFields <= 4 && numFields > 0 {
-			allSimple := true
-			for i := 0; i < numFields; i++ {
-				field := t.Field(i)
-				if !field.IsExported() {
-					continue
-				}
-				kind := field.Type.Kind()
-				// Check if all fields are simple types (no pointers, slices, maps, interfaces)
-				if kind == reflect.Ptr || kind == reflect.Slice || kind == reflect.Map ||
-					kind == reflect.Interface || kind == reflect.Struct || kind == reflect.Array {
-					allSimple = false
-					break
-				}
-			}
-
-			if allSimple {
-				// Use fast struct copying for simple small structs
-				return cloneSimpleStruct(src).(T)
-			}
-		}
-	}
+	// Note: Small struct fast path was removed as it added overhead
+	// The cached struct type info path below is more efficient
 
 	// Fast path for nil values without additional reflection
 	if v.Kind() == reflect.Ptr && v.IsNil() {
@@ -492,24 +466,4 @@ func (ctx *cloneContext) cloneInterface(v reflect.Value) reflect.Value {
 	}
 
 	return v
-}
-
-// cloneSimpleStruct creates a fast copy of simple structs with basic field types
-func cloneSimpleStruct(src interface{}) interface{} {
-	srcValue := reflect.ValueOf(src)
-	srcType := srcValue.Type()
-
-	// Create new struct of the same type
-	newStruct := reflect.New(srcType).Elem()
-
-	// Copy each exported field directly (no deep cloning needed for simple types)
-	for i := 0; i < srcValue.NumField(); i++ {
-		field := srcType.Field(i)
-		if field.IsExported() {
-			srcField := srcValue.Field(i)
-			newStruct.Field(i).Set(srcField)
-		}
-	}
-
-	return newStruct.Interface()
 }
