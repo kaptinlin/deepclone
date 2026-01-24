@@ -242,9 +242,15 @@ func (ctx *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 		// Channels cannot be meaningfully cloned, return nil channel of same type
 		return reflect.Zero(v.Type())
 
-	default:
+	case reflect.Invalid, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128,
+		reflect.Func, reflect.String, reflect.UnsafePointer:
 		// For primitives (int, bool, etc.), strings, functions, and unsafe pointers,
 		// we return the original value as they are either immutable or treated as values.
+		return v
+
+	default:
 		return v
 	}
 }
