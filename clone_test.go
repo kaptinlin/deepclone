@@ -46,6 +46,7 @@ func TestCloneSlices(t *testing.T) {
 		cloned := Clone(original)
 
 		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned)) // Strictly enforce capacity preservation
 		assert.NotSame(t, &original[0], &cloned[0]) // Ensure different memory
 
 		// Modify original to verify independence
@@ -58,6 +59,7 @@ func TestCloneSlices(t *testing.T) {
 		cloned := Clone(original)
 
 		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
 		assert.NotSame(t, &original[0], &cloned[0])
 	})
 
@@ -72,6 +74,7 @@ func TestCloneSlices(t *testing.T) {
 		cloned := Clone(original)
 		assert.Equal(t, original, cloned)
 		assert.Len(t, cloned, 0)
+		assert.Equal(t, cap(original), cap(cloned))
 	})
 }
 

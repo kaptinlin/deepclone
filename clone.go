@@ -1,6 +1,7 @@
 package deepclone
 
 import (
+	"maps"
 	"reflect"
 	"sync"
 )
@@ -94,6 +95,18 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 	return info
 }
 
+// cloneSliceExact creates a copy of the slice with exact capacity preservation.
+// Strict tests require the clone to have the same capacity as the original.
+// This helper is generic and inlined by the compiler for performance.
+func cloneSliceExact[S ~[]E, E any](s S) S {
+	if s == nil {
+		return nil
+	}
+	cloned := make(S, len(s), cap(s))
+	copy(cloned, s)
+	return cloned
+}
+
 // Clone creates a deep copy of the given value.
 // This is the main entry point for the deepclone package.
 //
@@ -125,83 +138,39 @@ func Clone[T any](src T) T {
 		return src
 	}
 
-	// Fast paths for common slice types - avoid reflection for better performance
+	// Fast paths for common slice types using generic cloneSliceExact helper
+	// We use this to ensure exact capacity preservation which is required by strict tests
 	switch s := any(src).(type) {
 	case []int:
-		if s == nil {
-			return src
-		}
-		cloned := make([]int, len(s))
-		copy(cloned, s)
-		return any(cloned).(T)
+		return any(cloneSliceExact(s)).(T)
 	case []string:
-		if s == nil {
-			return src
-		}
-		cloned := make([]string, len(s))
-		copy(cloned, s)
-		return any(cloned).(T)
+		return any(cloneSliceExact(s)).(T)
 	case []bool:
-		if s == nil {
-			return src
-		}
-		cloned := make([]bool, len(s))
-		copy(cloned, s)
-		return any(cloned).(T)
+		return any(cloneSliceExact(s)).(T)
 	case []float64:
-		if s == nil {
-			return src
-		}
-		cloned := make([]float64, len(s))
-		copy(cloned, s)
-		return any(cloned).(T)
+		return any(cloneSliceExact(s)).(T)
 	case []byte:
-		if s == nil {
-			return src
-		}
-		cloned := make([]byte, len(s))
-		copy(cloned, s)
-		return any(cloned).(T)
+		return any(cloneSliceExact(s)).(T)
 	}
 
-	// Fast paths for common map types - avoid reflection for better performance
+	// Fast paths for simple map types using generic maps package (Go 1.21+)
+	// map[string]interface{} is deliberately excluded to handle potential circular references via reflection
 	switch m := any(src).(type) {
 	case map[string]int:
 		if m == nil {
 			return src
 		}
-		cloned := make(map[string]int, len(m))
-		for k, v := range m {
-			cloned[k] = v
-		}
-		return any(cloned).(T)
+		return any(maps.Clone(m)).(T)
 	case map[string]string:
 		if m == nil {
 			return src
 		}
-		cloned := make(map[string]string, len(m))
-		for k, v := range m {
-			cloned[k] = v
-		}
-		return any(cloned).(T)
+		return any(maps.Clone(m)).(T)
 	case map[int]int:
 		if m == nil {
 			return src
 		}
-		cloned := make(map[int]int, len(m))
-		for k, v := range m {
-			cloned[k] = v
-		}
-		return any(cloned).(T)
-	case map[string]interface{}:
-		if m == nil {
-			return src
-		}
-		cloned := make(map[string]interface{}, len(m))
-		for k, v := range m {
-			cloned[k] = Clone(v) // Recursively clone values
-		}
-		return any(cloned).(T)
+		return any(maps.Clone(m)).(T)
 	}
 
 	// Fast paths for small structs - avoid reflection overhead for common patterns
@@ -251,16 +220,6 @@ func (ctx *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 	}
 
 	switch v.Kind() {
-	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
-		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
-		// Primitive types - return as-is (no allocation needed)
-		return v
-
-	case reflect.String:
-		// Strings are immutable in Go, so we can return the original
-		return v
-
 	case reflect.Ptr:
 		return ctx.clonePointer(v)
 
@@ -283,16 +242,9 @@ func (ctx *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 		// Channels cannot be meaningfully cloned, return nil channel of same type
 		return reflect.Zero(v.Type())
 
-	case reflect.Func:
-		// Functions cannot be cloned, return the original
-		return v
-
-	case reflect.Invalid, reflect.UnsafePointer:
-		// For invalid types and unsafe pointers, return the original value
-		return v
-
 	default:
-		// For any other types not explicitly handled, return the original value
+		// For primitives (int, bool, etc.), strings, functions, and unsafe pointers,
+		// we return the original value as they are either immutable or treated as values.
 		return v
 	}
 }
@@ -331,26 +283,31 @@ func (ctx *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	// Check for circular reference (slices can be circular through pointers)
-	if v.Len() > 0 && v.Index(0).Kind() == reflect.Ptr {
+	// Only track slices that might contain cycles or references.
+	// This avoids map overhead for primitive slices (e.g. []int, []byte).
+	elemKind := v.Type().Elem().Kind()
+	needsTracking := elemKind == reflect.Ptr || elemKind == reflect.Interface ||
+		elemKind == reflect.Slice || elemKind == reflect.Map || elemKind == reflect.Struct
+
+	if needsTracking {
 		addr := v.Pointer()
 		if cloned, exists := ctx.visited[addr]; exists {
-			return cloned
+			// Validation: Only return cached slice if it has the same length/capacity.
+			// This prevents aliasing bugs where a sub-slice gets replaced by the full slice.
+			if cloned.Len() == v.Len() && cloned.Cap() == v.Cap() {
+				return cloned
+			}
 		}
 	}
 
 	length := v.Len()
 	capacity := v.Cap()
-
-	// Create new slice with same length and capacity
 	newSlice := reflect.MakeSlice(v.Type(), length, capacity)
 
-	// Store in visited map for circular reference detection
-	if v.Len() > 0 && v.Index(0).Kind() == reflect.Ptr {
+	if needsTracking {
 		ctx.visited[v.Pointer()] = newSlice
 	}
 
-	// Copy elements with deep cloning
 	for i := 0; i < length; i++ {
 		elem := v.Index(i)
 		clonedElem := ctx.cloneValue(elem)
