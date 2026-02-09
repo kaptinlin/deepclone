@@ -310,20 +310,20 @@ func TestCloneCircularReference(t *testing.T) {
 // TestCloneEdgeCases tests various edge cases and boundary conditions
 func TestCloneEdgeCases(t *testing.T) {
 	t.Run("nil interface", func(t *testing.T) {
-		var original interface{}
+		var original any
 		cloned := Clone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("nil pointer to interface", func(t *testing.T) {
-		var original *interface{}
+		var original *any
 		cloned := Clone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("empty interface with nil value", func(t *testing.T) {
 		var nilPtr *int
-		var original interface{} = nilPtr
+		var original any = nilPtr
 		cloned := Clone(original)
 		assert.Nil(t, cloned)
 	})
@@ -390,7 +390,7 @@ func TestCloneEdgeCases(t *testing.T) {
 	})
 
 	t.Run("interface with concrete values", func(t *testing.T) {
-		tests := []interface{}{
+		tests := []any{
 			42,
 			"hello",
 			[]int{1, 2, 3},
@@ -439,7 +439,7 @@ func TestCloneEdgeCases(t *testing.T) {
 			Age       int
 			Addresses []Address
 			Friends   []*Person
-			Metadata  map[string]interface{}
+			Metadata  map[string]any
 			Parent    *Person
 		}
 
@@ -453,7 +453,7 @@ func TestCloneEdgeCases(t *testing.T) {
 				{Street: "123 Main St", City: "Anytown", ZipCode: &zip},
 				{Street: "456 Oak Ave", City: "Other City", ZipCode: nil},
 			},
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"score":    85.5,
 				"active":   true,
 				"tags":     []string{"premium", "verified"},
@@ -681,7 +681,7 @@ func TestCloneTypeAliases(t *testing.T) {
 
 	t.Run("type alias with interface field", func(t *testing.T) {
 		type Base struct {
-			Value interface{}
+			Value any
 		}
 		type Alias Base
 

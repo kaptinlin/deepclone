@@ -1,6 +1,6 @@
 package deepclone
 
-// Cloneable interface allows types to implement custom deep cloning behavior.
+// Cloneable allows types to implement custom deep cloning behavior.
 // Types implementing this interface will have their Clone method called
 // instead of using the default reflection-based cloning.
 //
@@ -13,14 +13,14 @@ package deepclone
 //	type Document struct {
 //	    Title   string
 //	    Content []byte
-//	    Metadata map[string]interface{}
+//	    Metadata map[string]any
 //	}
 //
 //	func (d Document) Clone() any {
 //	    return Document{
 //	        Title:   d.Title,
 //	        Content: deepclone.Clone(d.Content).([]byte),
-//	        Metadata: deepclone.Clone(d.Metadata).(map[string]interface{}),
+//	        Metadata: deepclone.Clone(d.Metadata).(map[string]any),
 //	    }
 //	}
 type Cloneable interface {
