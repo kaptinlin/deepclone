@@ -6,19 +6,19 @@ import (
 	"sync"
 )
 
-// cloneContext tracks visited objects to prevent infinite loops in circular references
+// cloneContext tracks visited objects to prevent infinite loops in circular references.
 type cloneContext struct {
 	visited map[uintptr]reflect.Value
 }
 
-// newCloneContext creates a new cloning context
+// newCloneContext creates a new cloning context.
 func newCloneContext() *cloneContext {
 	return &cloneContext{
 		visited: make(map[uintptr]reflect.Value, 8), // Pre-allocate for common cases
 	}
 }
 
-// fieldTypeCache caches field action decisions for struct types
+// fieldAction indicates whether a struct field needs deep cloning or simple copy.
 type fieldAction int
 
 const (
@@ -32,12 +32,12 @@ type structTypeInfo struct {
 }
 
 var (
-	// Cache for struct type information to avoid repeated reflection
+	// Cache for struct type information to avoid repeated reflection.
 	structCache = make(map[reflect.Type]*structTypeInfo)
 	cacheMutex  sync.RWMutex
 )
 
-// getStructTypeInfo returns cached or computed struct field information
+// getStructTypeInfo returns cached or computed struct field information.
 func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 	cacheMutex.RLock()
 	if info, exists := structCache[t]; exists {
@@ -59,7 +59,7 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 	actions := make([]fieldAction, numFields)
 	fields := make([]reflect.StructField, numFields)
 
-	for i := 0; i < numFields; i++ {
+	for i := range numFields {
 		field := t.Field(i)
 		fields[i] = field
 
@@ -72,7 +72,6 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 		kind := field.Type.Kind()
 		switch kind {
 		case reflect.Slice:
-			// All slices need deep cloning (both primitive and complex element types)
 			actions[i] = cloneField
 		case reflect.Map, reflect.Ptr, reflect.Interface, reflect.Array:
 			actions[i] = cloneField
@@ -82,7 +81,6 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 			reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128,
 			reflect.Chan, reflect.Func, reflect.String, reflect.UnsafePointer:
-			// Primitive types: bool, int*, uint*, float*, complex*, string, chan, func, etc.
 			actions[i] = copyField
 		}
 	}
@@ -173,31 +171,20 @@ func Clone[T any](src T) T {
 		return any(maps.Clone(m)).(T)
 	}
 
-	// Fast paths for small structs - avoid reflection overhead for common patterns
+	// Reflection-based path for complex types.
 	v := reflect.ValueOf(src)
 	if !v.IsValid() {
 		return src
 	}
 
-	// Check if type implements Cloneable interface FIRST
-	// This must come before any fast paths to respect custom cloning behavior
-	//
-	// The Cloneable interface allows types to implement custom deep cloning logic.
-	// When a type implements Cloneable, its Clone() method takes full responsibility
-	// for creating a deep copy of the object, including all nested data structures.
-	//
-	// This provides complete control over the cloning process for complex types
-	// that may need special handling, optimization, or custom semantics.
+	// Check if type implements Cloneable interface before reflection-based cloning.
 	if cloneable, ok := any(src).(Cloneable); ok {
 		if result, ok := cloneable.Clone().(T); ok {
 			return result
 		}
 	}
 
-	// Note: Small struct fast path was removed as it added overhead
-	// The cached struct type info path below is more efficient
-
-	// Fast path for nil values without additional reflection
+	// Fast path for nil pointers without additional reflection.
 	if v.Kind() == reflect.Ptr && v.IsNil() {
 		return src
 	}
@@ -239,20 +226,18 @@ func (ctx *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 		return ctx.cloneInterface(v)
 
 	case reflect.Chan:
-		// Channels cannot be meaningfully cloned, return nil channel of same type
+		// Channels cannot be meaningfully cloned; return nil channel of same type.
 		return reflect.Zero(v.Type())
 
 	case reflect.Invalid, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128,
 		reflect.Func, reflect.String, reflect.UnsafePointer:
-		// For primitives (int, bool, etc.), strings, functions, and unsafe pointers,
-		// we return the original value as they are either immutable or treated as values.
-		return v
-
-	default:
 		return v
 	}
+
+	// Unreachable: all reflect.Kind values are handled above.
+	return v
 }
 
 // clonePointer creates a deep copy of a pointer and its pointed value.
@@ -314,7 +299,7 @@ func (ctx *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 		ctx.visited[v.Pointer()] = newSlice
 	}
 
-	for i := 0; i < length; i++ {
+	for i := range length {
 		elem := v.Index(i)
 		clonedElem := ctx.cloneValue(elem)
 		if clonedElem.IsValid() {
@@ -422,7 +407,7 @@ func (ctx *cloneContext) cloneArray(v reflect.Value) reflect.Value {
 	newArray := reflect.New(arrayType).Elem()
 
 	// Copy each element with deep cloning
-	for i := 0; i < v.Len(); i++ {
+	for i := range v.Len() {
 		elem := v.Index(i)
 		clonedElem := ctx.cloneValue(elem)
 		if clonedElem.IsValid() {
