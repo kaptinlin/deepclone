@@ -6,6 +6,20 @@ import (
 	"sync"
 )
 
+// A fieldAction indicates whether a struct field needs deep cloning or simple copy.
+type fieldAction int
+
+const (
+	copyField  fieldAction = iota // Simple assignment (primitive types)
+	cloneField                    // Needs deep cloning (complex types)
+)
+
+var (
+	// structCache caches struct type information to avoid repeated reflection.
+	structCache = make(map[reflect.Type]*structTypeInfo)
+	cacheMutex  sync.RWMutex
+)
+
 // A cloneContext tracks visited objects to prevent infinite loops in circular references.
 type cloneContext struct {
 	visited map[uintptr]reflect.Value
@@ -17,26 +31,12 @@ func newCloneContext() *cloneContext {
 	}
 }
 
-// A fieldAction indicates whether a struct field needs deep cloning or simple copy.
-type fieldAction int
-
-const (
-	copyField  fieldAction = iota // Simple assignment (primitive types)
-	cloneField                    // Needs deep cloning (complex types)
-)
-
 // A structTypeInfo caches per-field clone decisions for a struct type
 // so that repeated cloning of the same type avoids redundant reflection.
 type structTypeInfo struct {
 	actions []fieldAction
 	fields  []reflect.StructField
 }
-
-var (
-	// Cache for struct type information to avoid repeated reflection.
-	structCache = make(map[reflect.Type]*structTypeInfo)
-	cacheMutex  sync.RWMutex
-)
 
 // getStructTypeInfo returns cached struct field information for the given type,
 // computing and caching it on first access.
