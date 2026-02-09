@@ -101,44 +101,142 @@ type cacheT22 struct{ F1, F2 bool }
 type cacheT23 struct{ F1, F2, F3 bool }
 type cacheT24 struct{ F1, F2, F3, F4 bool }
 type cacheT25 struct{ F1, F2, F3, F4, F5 bool }
-type cacheT26 struct{ A int; B string }
-type cacheT27 struct{ A int; B string; C float64 }
-type cacheT28 struct{ A int; B string; C float64; D bool }
-type cacheT29 struct{ A int; B string; C float64; D bool; E int }
-type cacheT30 struct{ A int; B string; C float64; D bool; E int; F string }
+type cacheT26 struct {
+	A int
+	B string
+}
+type cacheT27 struct {
+	A int
+	B string
+	C float64
+}
+type cacheT28 struct {
+	A int
+	B string
+	C float64
+	D bool
+}
+type cacheT29 struct {
+	A int
+	B string
+	C float64
+	D bool
+	E int
+}
+type cacheT30 struct {
+	A int
+	B string
+	C float64
+	D bool
+	E int
+	F string
+}
 type cacheT31 struct{ X []int }
 type cacheT32 struct{ X []string }
 type cacheT33 struct{ X map[string]int }
 type cacheT34 struct{ X *int }
 type cacheT35 struct{ X *string }
-type cacheT36 struct{ X []int; Y string }
-type cacheT37 struct{ X []string; Y int }
-type cacheT38 struct{ X map[string]int; Y bool }
-type cacheT39 struct{ X *int; Y float64 }
-type cacheT40 struct{ X *string; Y int }
+type cacheT36 struct {
+	X []int
+	Y string
+}
+type cacheT37 struct {
+	X []string
+	Y int
+}
+type cacheT38 struct {
+	X map[string]int
+	Y bool
+}
+type cacheT39 struct {
+	X *int
+	Y float64
+}
+type cacheT40 struct {
+	X *string
+	Y int
+}
 type cacheT41 struct{ A, B, C, D, E, F, G, H, I, J int }
 type cacheT42 struct{ A, B, C, D, E, F, G, H, I, J string }
 type cacheT43 struct{ A, B, C, D, E, F, G, H, I, J float64 }
 type cacheT44 struct{ A, B, C, D, E, F, G, H, I, J bool }
-type cacheT45 struct{ A int; B []int; C map[string]int; D *int; E string }
-type cacheT46 struct{ A string; B []string; C map[string]string; D *string; E int }
-type cacheT47 struct{ A float64; B []float64; C map[string]float64; D *float64; E bool }
+type cacheT45 struct {
+	A int
+	B []int
+	C map[string]int
+	D *int
+	E string
+}
+type cacheT46 struct {
+	A string
+	B []string
+	C map[string]string
+	D *string
+	E int
+}
+type cacheT47 struct {
+	A float64
+	B []float64
+	C map[string]float64
+	D *float64
+	E bool
+}
 type cacheT48 struct{ A, B, C, D, E, F, G, H, I, J, K, L, M, N, O int }
 type cacheT49 struct{ A, B, C, D, E, F, G, H, I, J, K, L, M, N, O string }
 type cacheT50 struct{ A, B, C, D, E, F, G, H, I, J, K, L, M, N, O float64 }
 
 // cloneManyDistinctTypes populates the cache with 50 distinct struct types.
 func cloneManyDistinctTypes() {
-	Clone(cacheT01{}); Clone(cacheT02{}); Clone(cacheT03{}); Clone(cacheT04{}); Clone(cacheT05{})
-	Clone(cacheT06{}); Clone(cacheT07{}); Clone(cacheT08{}); Clone(cacheT09{}); Clone(cacheT10{})
-	Clone(cacheT11{}); Clone(cacheT12{}); Clone(cacheT13{}); Clone(cacheT14{}); Clone(cacheT15{})
-	Clone(cacheT16{}); Clone(cacheT17{}); Clone(cacheT18{}); Clone(cacheT19{}); Clone(cacheT20{})
-	Clone(cacheT21{}); Clone(cacheT22{}); Clone(cacheT23{}); Clone(cacheT24{}); Clone(cacheT25{})
-	Clone(cacheT26{}); Clone(cacheT27{}); Clone(cacheT28{}); Clone(cacheT29{}); Clone(cacheT30{})
-	Clone(cacheT31{}); Clone(cacheT32{}); Clone(cacheT33{}); Clone(cacheT34{}); Clone(cacheT35{})
-	Clone(cacheT36{}); Clone(cacheT37{}); Clone(cacheT38{}); Clone(cacheT39{}); Clone(cacheT40{})
-	Clone(cacheT41{}); Clone(cacheT42{}); Clone(cacheT43{}); Clone(cacheT44{}); Clone(cacheT45{})
-	Clone(cacheT46{}); Clone(cacheT47{}); Clone(cacheT48{}); Clone(cacheT49{}); Clone(cacheT50{})
+	Clone(cacheT01{})
+	Clone(cacheT02{})
+	Clone(cacheT03{})
+	Clone(cacheT04{})
+	Clone(cacheT05{})
+	Clone(cacheT06{})
+	Clone(cacheT07{})
+	Clone(cacheT08{})
+	Clone(cacheT09{})
+	Clone(cacheT10{})
+	Clone(cacheT11{})
+	Clone(cacheT12{})
+	Clone(cacheT13{})
+	Clone(cacheT14{})
+	Clone(cacheT15{})
+	Clone(cacheT16{})
+	Clone(cacheT17{})
+	Clone(cacheT18{})
+	Clone(cacheT19{})
+	Clone(cacheT20{})
+	Clone(cacheT21{})
+	Clone(cacheT22{})
+	Clone(cacheT23{})
+	Clone(cacheT24{})
+	Clone(cacheT25{})
+	Clone(cacheT26{})
+	Clone(cacheT27{})
+	Clone(cacheT28{})
+	Clone(cacheT29{})
+	Clone(cacheT30{})
+	Clone(cacheT31{})
+	Clone(cacheT32{})
+	Clone(cacheT33{})
+	Clone(cacheT34{})
+	Clone(cacheT35{})
+	Clone(cacheT36{})
+	Clone(cacheT37{})
+	Clone(cacheT38{})
+	Clone(cacheT39{})
+	Clone(cacheT40{})
+	Clone(cacheT41{})
+	Clone(cacheT42{})
+	Clone(cacheT43{})
+	Clone(cacheT44{})
+	Clone(cacheT45{})
+	Clone(cacheT46{})
+	Clone(cacheT47{})
+	Clone(cacheT48{})
+	Clone(cacheT49{})
+	Clone(cacheT50{})
 }
 
 // TestCacheMemoryFootprint validates that the struct field cache uses
