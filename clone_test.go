@@ -1315,3 +1315,123 @@ func TestCloneUnsafePointer(t *testing.T) {
 		assert.Equal(t, ptr, cloned.Value)
 	})
 }
+
+// DeepNested is a recursive struct for ultra-deep nesting tests.
+type DeepNested struct {
+	Depth int
+	Data  string
+	Tags  []string
+	Meta  map[string]int
+	Child *DeepNested
+}
+
+// buildDeepNested constructs a chain of DeepNested structs with the given depth.
+func buildDeepNested(depth int) *DeepNested {
+	root := &DeepNested{
+		Depth: 0,
+		Data:  fmt.Sprintf("level-%d", 0),
+		Tags:  []string{"tag0a", "tag0b"},
+		Meta:  map[string]int{"x": 0},
+	}
+	current := root
+	for i := 1; i < depth; i++ {
+		child := &DeepNested{
+			Depth: i,
+			Data:  fmt.Sprintf("level-%d", i),
+			Tags:  []string{fmt.Sprintf("tag%da", i), fmt.Sprintf("tag%db", i)},
+			Meta:  map[string]int{"x": i},
+		}
+		current.Child = child
+		current = child
+	}
+	return root
+}
+
+func TestCloneUltraDeepNestedStruct(t *testing.T) {
+	t.Run("depth 1000", func(t *testing.T) {
+		const depth = 1000
+		original := buildDeepNested(depth)
+
+		cloned := Clone(original)
+
+		// Walk both chains and verify equality and independence.
+		origCur, cloneCur := original, cloned
+		for i := range depth {
+			require.NotNil(t, cloneCur, "nil at depth %d", i)
+			assert.Equal(t, i, cloneCur.Depth)
+			assert.Equal(t, fmt.Sprintf("level-%d", i), cloneCur.Data)
+			assert.Equal(t, origCur.Tags, cloneCur.Tags)
+			assert.Equal(t, origCur.Meta, cloneCur.Meta)
+
+			// Verify deep independence: mutate original, clone unaffected.
+			origCur.Data = "mutated"
+			assert.NotEqual(t, origCur.Data, cloneCur.Data)
+
+			origCur.Tags[0] = "mutated"
+			assert.NotEqual(t, origCur.Tags[0], cloneCur.Tags[0])
+
+			origCur.Meta["x"] = -1
+			assert.NotEqual(t, origCur.Meta["x"], cloneCur.Meta["x"])
+
+			origCur = origCur.Child
+			cloneCur = cloneCur.Child
+		}
+		// Both chains should terminate at the same depth.
+		assert.Nil(t, origCur)
+		assert.Nil(t, cloneCur)
+	})
+
+	t.Run("depth 10000", func(t *testing.T) {
+		const depth = 10000
+		original := buildDeepNested(depth)
+
+		cloned := Clone(original)
+
+		// Verify total depth by walking the chain.
+		count := 0
+		for cur := cloned; cur != nil; cur = cur.Child {
+			count++
+		}
+		assert.Equal(t, depth, count)
+
+		// Spot-check a few levels.
+		cur := cloned
+		for range 9999 {
+			cur = cur.Child
+		}
+		assert.Equal(t, 9999, cur.Depth)
+		assert.Equal(t, "level-9999", cur.Data)
+		assert.Nil(t, cur.Child)
+	})
+
+	t.Run("deep chain with circular ref at leaf", func(t *testing.T) {
+		const depth = 500
+		original := buildDeepNested(depth)
+
+		// Create circular reference: leaf points back to root.
+		leaf := original
+		for leaf.Child != nil {
+			leaf = leaf.Child
+		}
+		leaf.Child = original
+
+		cloned := Clone(original)
+
+		// Walk to the leaf of the clone.
+		clonedLeaf := cloned
+		for range depth - 1 {
+			require.NotNil(t, clonedLeaf.Child)
+			clonedLeaf = clonedLeaf.Child
+		}
+		assert.Equal(t, depth-1, clonedLeaf.Depth)
+
+		// The leaf's Child should point back to the cloned root.
+		require.NotNil(t, clonedLeaf.Child)
+		assert.True(t, clonedLeaf.Child == cloned,
+			"circular reference at leaf should point to cloned root")
+
+		// Verify independence from original.
+		assert.False(t, cloned == original)
+		assert.False(t, clonedLeaf.Child == original)
+	})
+}
