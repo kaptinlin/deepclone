@@ -101,13 +101,15 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 	return info
 }
 
-// CacheStats returns the number of struct types currently cached
-// and the total number of cached fields across all types.
+// CacheStats returns the number of struct types currently cached (entries)
+// and the total number of cached fields across all types (fields).
 //
 // This is useful for monitoring cache growth and validating that
 // memory usage remains bounded. In practice, the entry count equals
 // the number of distinct struct types cloned by the program, which
 // is finite and compile-time determined.
+//
+// CacheStats is safe for concurrent use.
 func CacheStats() (entries, fields int) {
 	cacheMutex.RLock()
 	defer cacheMutex.RUnlock()
@@ -120,13 +122,15 @@ func CacheStats() (entries, fields int) {
 }
 
 // ResetCache clears the struct type cache, releasing all cached
-// reflection data. Subsequent clone operations will re-populate
+// reflection data. Subsequent [Clone] operations will re-populate
 // the cache on demand.
 //
 // This is primarily useful in tests or long-running applications
 // that dynamically load and unload plugins with unique struct types.
 // Under normal usage the cache is small (bounded by the number of
 // distinct struct types) and does not need to be reset.
+//
+// ResetCache is safe for concurrent use.
 func ResetCache() {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
@@ -145,19 +149,21 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 	return cloned
 }
 
-// Clone creates a deep copy of the given value.
+// Clone creates a deep copy of the given value, preserving the complete
+// object graph including circular references.
 //
-// It supports all basic Go types and uses optimized paths
-// for common scenarios to achieve maximum performance.
+// Clone uses a hierarchical optimization strategy for maximum performance:
+//   - Primitive types (int, string, bool, etc.) return as-is with zero allocation
+//   - Common slice types ([]int, []string, []byte, etc.) use optimized generic copy
+//   - Common map types (map[string]string, etc.) use [maps.Clone]
+//   - Types implementing [Cloneable] delegate to their Clone method
+//   - All other types use cached reflection with circular reference detection
 //
-// For custom types, implement the Cloneable interface to provide
-// specialized cloning behavior.
-//
-// Performance characteristics:
-//   - Zero allocation for primitive types
-//   - Optimized paths for slices, maps, and common structs
-//   - Reflection caching for repeated struct types
-//   - Circular reference detection to prevent infinite loops
+// Special cases:
+//   - nil values return as-is
+//   - Channels return the zero value of their type
+//   - Functions return as-is (cannot be deep cloned)
+//   - Slice capacity and map size hints are preserved
 //
 // Usage:
 //
