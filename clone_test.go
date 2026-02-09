@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1255,4 +1256,62 @@ func TestCloneSliceSubSliceAliasing(t *testing.T) {
 	assert.Len(t, cloned.Sub, 2)
 	assert.Equal(t, 5, cap(cloned.Full))
 	assert.Equal(t, 5, cap(cloned.Sub))
+}
+
+// TestCloneUnsafePointer covers the unsafe.Pointer as-is return path
+// in cloneValue. unsafe.Pointer is an opaque type that cannot be
+// meaningfully deep cloned, so it is copied by value (same address).
+func TestCloneUnsafePointer(t *testing.T) {
+	t.Run("direct via interface", func(t *testing.T) {
+		x := 42
+		ptr := unsafe.Pointer(&x) //nolint:gosec // intentional unsafe.Pointer test
+		cloned := Clone(ptr)
+
+		// unsafe.Pointer should be copied as-is (same address).
+		assert.Equal(t, ptr, cloned)
+	})
+
+	t.Run("struct field", func(t *testing.T) {
+		type WithUnsafePointer struct {
+			Ptr  unsafe.Pointer
+			Name string
+		}
+
+		x := 99
+		original := WithUnsafePointer{
+			Ptr:  unsafe.Pointer(&x), //nolint:gosec // intentional unsafe.Pointer test
+			Name: "test",
+		}
+		cloned := Clone(original)
+
+		assert.Equal(t, "test", cloned.Name)
+		// unsafe.Pointer field should be copied by value.
+		assert.Equal(t, original.Ptr, cloned.Ptr)
+	})
+
+	t.Run("nil unsafe pointer", func(t *testing.T) {
+		type WithUnsafePointer struct {
+			Ptr unsafe.Pointer
+		}
+
+		original := WithUnsafePointer{Ptr: nil}
+		cloned := Clone(original)
+
+		assert.Equal(t, unsafe.Pointer(nil), cloned.Ptr) //nolint:gosec // intentional nil unsafe.Pointer test
+	})
+
+	t.Run("inside interface field", func(t *testing.T) {
+		type WithInterface struct {
+			Value any
+		}
+
+		x := 7
+		ptr := unsafe.Pointer(&x) //nolint:gosec // intentional unsafe.Pointer test
+		original := WithInterface{Value: ptr}
+		cloned := Clone(original)
+
+		// unsafe.Pointer inside interface goes through
+		// cloneValue and should be returned as-is.
+		assert.Equal(t, ptr, cloned.Value)
+	})
 }
