@@ -5,22 +5,24 @@ package deepclone
 // instead of using the default reflection-based cloning.
 //
 // The Clone method should return a deep copy of the receiver.
-// It's the implementer's responsibility to ensure all nested data
-// is properly cloned to maintain complete independence from the original.
+// The implementer must ensure all nested data is properly deep copied
+// to maintain complete independence from the original. Note that the
+// library's built-in circular reference detection does not apply inside
+// a custom Clone method; handle cycles manually if needed.
 //
 // Example:
 //
 //	type Document struct {
-//	    Title   string
-//	    Content []byte
+//	    Title    string
+//	    Content  []byte
 //	    Metadata map[string]any
 //	}
 //
 //	func (d Document) Clone() any {
 //	    return Document{
-//	        Title:   d.Title,
-//	        Content: deepclone.Clone(d.Content).([]byte),
-//	        Metadata: deepclone.Clone(d.Metadata).(map[string]any),
+//	        Title:    d.Title,
+//	        Content:  deepclone.Clone(d.Content),
+//	        Metadata: deepclone.Clone(d.Metadata),
 //	    }
 //	}
 type Cloneable interface {
