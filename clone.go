@@ -131,23 +131,41 @@ func Clone[T any](src T) T {
 		return src
 	}
 
-	// Fast paths for common slice types using generic cloneSliceExact helper
-	// We use this to ensure exact capacity preservation which is required by strict tests
+	// Fast paths for common slice types using generic cloneSliceExact helper.
+	// We use this to ensure exact capacity preservation which is required by strict tests.
 	switch s := any(src).(type) {
 	case []int:
+		return any(cloneSliceExact(s)).(T)
+	case []int8:
+		return any(cloneSliceExact(s)).(T)
+	case []int16:
+		return any(cloneSliceExact(s)).(T)
+	case []int32:
+		return any(cloneSliceExact(s)).(T)
+	case []int64:
+		return any(cloneSliceExact(s)).(T)
+	case []uint:
+		return any(cloneSliceExact(s)).(T)
+	case []uint16:
+		return any(cloneSliceExact(s)).(T)
+	case []uint32:
+		return any(cloneSliceExact(s)).(T)
+	case []uint64:
+		return any(cloneSliceExact(s)).(T)
+	case []float32:
+		return any(cloneSliceExact(s)).(T)
+	case []float64:
 		return any(cloneSliceExact(s)).(T)
 	case []string:
 		return any(cloneSliceExact(s)).(T)
 	case []bool:
 		return any(cloneSliceExact(s)).(T)
-	case []float64:
-		return any(cloneSliceExact(s)).(T)
 	case []byte:
 		return any(cloneSliceExact(s)).(T)
 	}
 
-	// Fast paths for simple map types using generic maps package (Go 1.21+)
-	// map[string]any is deliberately excluded to handle potential circular references via reflection
+	// Fast paths for simple map types using generic maps package (Go 1.21+).
+	// map[string]any is deliberately excluded to handle potential circular references via reflection.
 	switch m := any(src).(type) {
 	case map[string]int:
 		if m == nil {
@@ -159,7 +177,27 @@ func Clone[T any](src T) T {
 			return src
 		}
 		return any(maps.Clone(m)).(T)
+	case map[string]float64:
+		if m == nil {
+			return src
+		}
+		return any(maps.Clone(m)).(T)
+	case map[string]bool:
+		if m == nil {
+			return src
+		}
+		return any(maps.Clone(m)).(T)
 	case map[int]int:
+		if m == nil {
+			return src
+		}
+		return any(maps.Clone(m)).(T)
+	case map[int]string:
+		if m == nil {
+			return src
+		}
+		return any(maps.Clone(m)).(T)
+	case map[int]bool:
 		if m == nil {
 			return src
 		}

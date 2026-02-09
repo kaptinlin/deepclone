@@ -63,6 +63,125 @@ func TestCloneSlices(t *testing.T) {
 		assert.NotSame(t, &original[0], &cloned[0])
 	})
 
+	t.Run("int8 slice", func(t *testing.T) {
+		original := []int8{1, -2, 3}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 99
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("int16 slice", func(t *testing.T) {
+		original := []int16{100, -200, 300}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("int32 slice", func(t *testing.T) {
+		original := []int32{100000, -200000, 300000}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("int64 slice", func(t *testing.T) {
+		original := []int64{1e12, -2e12, 3e12}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("uint slice", func(t *testing.T) {
+		original := []uint{1, 2, 3}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("uint16 slice", func(t *testing.T) {
+		original := []uint16{100, 200, 300}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("uint32 slice", func(t *testing.T) {
+		original := []uint32{100000, 200000, 300000}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("uint64 slice", func(t *testing.T) {
+		original := []uint64{1e12, 2e12, 3e12}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("float32 slice", func(t *testing.T) {
+		original := []float32{1.1, 2.2, 3.3}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999.9
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("nil slice types", func(t *testing.T) {
+		var nilInt8 []int8
+		assert.Nil(t, Clone(nilInt8))
+
+		var nilInt16 []int16
+		assert.Nil(t, Clone(nilInt16))
+
+		var nilInt32 []int32
+		assert.Nil(t, Clone(nilInt32))
+
+		var nilInt64 []int64
+		assert.Nil(t, Clone(nilInt64))
+
+		var nilUint []uint
+		assert.Nil(t, Clone(nilUint))
+
+		var nilUint16 []uint16
+		assert.Nil(t, Clone(nilUint16))
+
+		var nilUint32 []uint32
+		assert.Nil(t, Clone(nilUint32))
+
+		var nilUint64 []uint64
+		assert.Nil(t, Clone(nilUint64))
+
+		var nilFloat32 []float32
+		assert.Nil(t, Clone(nilFloat32))
+	})
+
 	t.Run("nil slice", func(t *testing.T) {
 		var original []int
 		cloned := Clone(original)
@@ -92,6 +211,72 @@ func TestCloneMaps(t *testing.T) {
 		// Modify original to verify independence
 		original["four"] = 4
 		assert.NotContains(t, cloned, "four")
+	})
+
+	t.Run("string to float64 map", func(t *testing.T) {
+		original := map[string]float64{
+			"pi": 3.14159,
+			"e":  2.71828,
+		}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+
+		original["phi"] = 1.618
+		assert.NotContains(t, cloned, "phi")
+	})
+
+	t.Run("string to bool map", func(t *testing.T) {
+		original := map[string]bool{
+			"active":  true,
+			"deleted": false,
+		}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+
+		original["new"] = true
+		assert.NotContains(t, cloned, "new")
+	})
+
+	t.Run("int to string map", func(t *testing.T) {
+		original := map[int]string{
+			1: "one",
+			2: "two",
+		}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+
+		original[3] = "three"
+		assert.NotContains(t, cloned, 3)
+	})
+
+	t.Run("int to bool map", func(t *testing.T) {
+		original := map[int]bool{
+			1: true,
+			2: false,
+		}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+
+		original[3] = true
+		assert.NotContains(t, cloned, 3)
+	})
+
+	t.Run("nil map types", func(t *testing.T) {
+		var nilStringFloat64 map[string]float64
+		assert.Nil(t, Clone(nilStringFloat64))
+
+		var nilStringBool map[string]bool
+		assert.Nil(t, Clone(nilStringBool))
+
+		var nilIntString map[int]string
+		assert.Nil(t, Clone(nilIntString))
+
+		var nilIntBool map[int]bool
+		assert.Nil(t, Clone(nilIntBool))
 	})
 
 	t.Run("nil map", func(t *testing.T) {
