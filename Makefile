@@ -31,19 +31,19 @@ deps: ## Download Go module dependencies
 .PHONY: test
 test: ## Run all tests
 	@echo "[test] Running all tests..."
-	@go test ./...
+	@go test -race ./...
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage report
 	@echo "[test] Running tests with coverage..."
-	@go test -coverprofile=coverage.out ./...
+	@go test -race -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "[test] Coverage report generated: coverage.html"
 
 .PHONY: test-verbose
 test-verbose: ## Run tests with verbose output
 	@echo "[test] Running tests with verbose output..."
-	@go test -v ./...
+	@go test -race -v ./...
 
 .PHONY: bench
 bench: ## Run benchmarks
