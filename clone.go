@@ -16,6 +16,17 @@ const (
 
 var (
 	// structCache caches struct type information to avoid repeated reflection.
+	//
+	// Memory analysis: LRU eviction is unnecessary because the cache is keyed
+	// by reflect.Type, which is interned by the Go runtime — each distinct
+	// struct type has exactly one reflect.Type value. The number of entries is
+	// bounded by the number of distinct struct types the program clones, which
+	// is finite and determined at compile time. Even a large application with
+	// 1000 struct types averaging 10 fields uses ~1.3 MB — negligible for any
+	// program that uses reflection. Adding LRU would hurt hot-path performance
+	// (linked-list pointer updates + extra locking) for no practical benefit.
+	//
+	// Use ResetCache to reclaim memory if needed (e.g., in tests).
 	structCache = make(map[reflect.Type]*structTypeInfo)
 	cacheMutex  sync.RWMutex
 )
@@ -88,6 +99,39 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 	}
 	structCache[t] = info
 	return info
+}
+
+// CacheStats returns the number of struct types currently cached
+// and the total number of cached fields across all types.
+//
+// This is useful for monitoring cache growth and validating that
+// memory usage remains bounded. In practice, the entry count equals
+// the number of distinct struct types cloned by the program, which
+// is finite and compile-time determined.
+func CacheStats() (entries, fields int) {
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+
+	entries = len(structCache)
+	for _, info := range structCache {
+		fields += len(info.fields)
+	}
+	return entries, fields
+}
+
+// ResetCache clears the struct type cache, releasing all cached
+// reflection data. Subsequent clone operations will re-populate
+// the cache on demand.
+//
+// This is primarily useful in tests or long-running applications
+// that dynamically load and unload plugins with unique struct types.
+// Under normal usage the cache is small (bounded by the number of
+// distinct struct types) and does not need to be reset.
+func ResetCache() {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
+	clear(structCache)
 }
 
 // cloneSliceExact creates a copy of the slice with exact capacity preservation.
