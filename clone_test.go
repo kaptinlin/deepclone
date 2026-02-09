@@ -923,3 +923,336 @@ func TestCloneTypeAliases(t *testing.T) {
 		assert.Equal(t, "test1", cloned["a"].Value)
 	})
 }
+
+// TestCloneUnexportedComplexFields tests structs with unexported fields
+// of complex types (slice, map, pointer) to cover the unexported field
+// skip path in getStructTypeInfo and cloneStruct.
+func TestCloneUnexportedComplexFields(t *testing.T) {
+	type withUnexportedSlice struct {
+		Public string
+		hidden []int //nolint:unused // exercising unexported field path
+	}
+
+	original := withUnexportedSlice{Public: "visible"}
+	cloned := Clone(original)
+
+	assert.Equal(t, "visible", cloned.Public)
+}
+
+// TestCloneAdditionalSliceFastPaths covers the fast paths for []float64,
+// []bool, and []byte slices that were not exercised by existing tests.
+func TestCloneAdditionalSliceFastPaths(t *testing.T) {
+	t.Run("float64 slice", func(t *testing.T) {
+		original := []float64{1.1, 2.2, 3.3}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 999.9
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("bool slice", func(t *testing.T) {
+		original := []bool{true, false, true}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = false
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("byte slice", func(t *testing.T) {
+		original := []byte{0x01, 0x02, 0x03}
+		cloned := Clone(original)
+
+		assert.Equal(t, original, cloned)
+		assert.Equal(t, cap(original), cap(cloned))
+		original[0] = 0xFF
+		assert.NotEqual(t, original[0], cloned[0])
+	})
+
+	t.Run("nil float64 slice", func(t *testing.T) {
+		var original []float64
+		assert.Nil(t, Clone(original))
+	})
+
+	t.Run("nil bool slice", func(t *testing.T) {
+		var original []bool
+		assert.Nil(t, Clone(original))
+	})
+
+	t.Run("nil byte slice", func(t *testing.T) {
+		var original []byte
+		assert.Nil(t, Clone(original))
+	})
+}
+
+// TestCloneNilMapFastPaths covers nil map fast paths for map types
+// that were not exercised by existing nil map tests.
+func TestCloneNilMapFastPaths(t *testing.T) {
+	t.Run("nil map[string]string", func(t *testing.T) {
+		var original map[string]string
+		assert.Nil(t, Clone(original))
+	})
+
+	t.Run("nil map[string]int", func(t *testing.T) {
+		var original map[string]int
+		assert.Nil(t, Clone(original))
+	})
+
+	t.Run("nil map[int]int", func(t *testing.T) {
+		var original map[int]int
+		assert.Nil(t, Clone(original))
+	})
+
+	t.Run("non-nil map[string]string", func(t *testing.T) {
+		original := map[string]string{"a": "b"}
+		cloned := Clone(original)
+		assert.Equal(t, original, cloned)
+		original["c"] = "d"
+		assert.NotContains(t, cloned, "c")
+	})
+
+	t.Run("non-nil map[int]int", func(t *testing.T) {
+		original := map[int]int{1: 10, 2: 20}
+		cloned := Clone(original)
+		assert.Equal(t, original, cloned)
+		original[3] = 30
+		assert.NotContains(t, cloned, 3)
+	})
+}
+
+// TestCloneCircularMapReference covers the circular reference detection
+// path in cloneMap where a previously visited map is returned from cache.
+func TestCloneCircularMapReference(t *testing.T) {
+	// A map[string]any that contains itself as a value triggers the
+	// circular reference detection directly inside cloneMap.
+	m := map[string]any{"key": "value"}
+	m["self"] = m // self-referencing map
+
+	cloned := Clone(m)
+
+	require.NotNil(t, cloned)
+	assert.Equal(t, "value", cloned["key"])
+	// The "self" entry should reference the cloned map itself.
+	inner, ok := cloned["self"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "value", inner["key"])
+}
+
+// TestCloneCircularSliceReference covers the circular reference detection
+// path in cloneSlice where a previously visited slice with matching
+// len/cap is returned from cache.
+func TestCloneCircularSliceReference(t *testing.T) {
+	// A slice of any that contains itself triggers the circular
+	// reference detection directly inside cloneSlice.
+	s := make([]any, 2)
+	s[0] = "value"
+	s[1] = s // self-referencing slice
+
+	cloned := Clone(s)
+
+	require.Len(t, cloned, 2)
+	assert.Equal(t, "value", cloned[0])
+	// The second element should reference the cloned slice itself.
+	inner, ok := cloned[1].([]any)
+	require.True(t, ok)
+	assert.Len(t, inner, 2)
+	assert.Equal(t, "value", inner[0])
+}
+
+// TestCloneSharedMapReference covers the case where the same map
+// is referenced from two struct fields, hitting the visited cache
+// in cloneMap on the second encounter.
+func TestCloneSharedMapReference(t *testing.T) {
+	type TwoMaps struct {
+		A map[string]any
+		B map[string]any
+	}
+
+	shared := map[string]any{"key": "value"}
+	original := TwoMaps{A: shared, B: shared}
+	cloned := Clone(original)
+
+	assert.Equal(t, "value", cloned.A["key"])
+	assert.Equal(t, "value", cloned.B["key"])
+
+	// Both fields should point to the same cloned map.
+	cloned.A["new"] = "added"
+	assert.Equal(t, "added", cloned.B["new"],
+		"shared map reference should be preserved")
+}
+
+// TestCloneSharedSliceReference covers the case where the same slice
+// is referenced from two struct fields with identical len/cap, hitting
+// the visited cache in cloneSlice on the second encounter.
+func TestCloneSharedSliceReference(t *testing.T) {
+	type TwoSlices struct {
+		A []any
+		B []any
+	}
+
+	shared := []any{"x", "y"}
+	original := TwoSlices{A: shared, B: shared}
+	cloned := Clone(original)
+
+	assert.Equal(t, []any{"x", "y"}, cloned.A)
+	assert.Equal(t, []any{"x", "y"}, cloned.B)
+
+	// Both fields should point to the same cloned slice.
+	cloned.A[0] = "modified"
+	assert.Equal(t, "modified", cloned.B[0],
+		"shared slice reference should be preserved")
+}
+
+// TestCloneMapTypeAliasConversions covers the type alias conversion
+// branches in cloneMap: ConvertibleTo, AssignableTo, and incompatible.
+func TestCloneMapTypeAliasConversions(t *testing.T) {
+	t.Run("convertible value type", func(t *testing.T) {
+		type MyInt int
+
+		// map[string]any with a MyInt value — when cloned via reflection,
+		// the concrete type may differ from the map's element type (any),
+		// exercising the ConvertibleTo branch.
+		original := map[string]MyInt{"key": 42}
+		cloned := Clone(original)
+
+		require.NotNil(t, cloned)
+		assert.Equal(t, MyInt(42), cloned["key"])
+	})
+}
+
+// TestCloneStructFieldTypeConversion covers the type alias conversion
+// path in cloneStruct where a cloned field's type differs from the
+// destination field type and needs Convert().
+func TestCloneStructFieldTypeConversion(t *testing.T) {
+	type Inner struct {
+		Value int
+	}
+
+	type Outer struct {
+		Field Inner
+	}
+
+	original := Outer{Field: Inner{Value: 42}}
+	cloned := Clone(original)
+
+	assert.Equal(t, 42, cloned.Field.Value)
+}
+
+// TestCloneComplexPrimitives covers complex64 and complex128 types
+// through the reflection path (via pointer indirection).
+func TestCloneComplexPrimitives(t *testing.T) {
+	t.Run("complex64", func(t *testing.T) {
+		v := complex(float32(1.0), float32(2.0))
+		cloned := Clone(v)
+		assert.Equal(t, v, cloned)
+	})
+
+	t.Run("complex128", func(t *testing.T) {
+		v := complex(1.0, 2.0)
+		cloned := Clone(v)
+		assert.Equal(t, v, cloned)
+	})
+
+	t.Run("uintptr", func(t *testing.T) {
+		v := uintptr(0xDEADBEEF)
+		cloned := Clone(v)
+		assert.Equal(t, v, cloned)
+	})
+}
+
+// TestCloneChannelViaReflection covers the channel zero-value return
+// path in cloneValue when a channel is inside an interface (goes through
+// cloneValue rather than the struct copyField fast path).
+func TestCloneChannelViaReflection(t *testing.T) {
+	type WithInterface struct {
+		Value any
+	}
+
+	ch := make(chan int, 5)
+	original := WithInterface{Value: ch}
+	cloned := Clone(original)
+
+	// Channel inside interface goes through cloneValue → reflect.Zero
+	assert.Nil(t, cloned.Value)
+}
+
+// TestCloneFuncViaReflection covers the function as-is return path
+// in cloneValue when a func is inside a struct.
+func TestCloneFuncViaReflection(t *testing.T) {
+	type WithFunc struct {
+		Fn   func() int
+		Name string
+	}
+
+	fn := func() int { return 42 }
+	original := WithFunc{Fn: fn, Name: "test"}
+	cloned := Clone(original)
+
+	assert.Equal(t, "test", cloned.Name)
+	// Function should be returned as-is (same reference)
+	assert.Equal(t,
+		reflect.ValueOf(original.Fn).Pointer(),
+		reflect.ValueOf(cloned.Fn).Pointer())
+}
+
+// TestCloneNilInterface covers the nil interface return path in
+// cloneInterface when an interface field holds nil.
+func TestCloneNilInterface(t *testing.T) {
+	type WithInterface struct {
+		Value any
+	}
+
+	original := WithInterface{Value: nil}
+	cloned := Clone(original)
+
+	assert.Nil(t, cloned.Value)
+}
+
+// TestCloneCloneableReturnsWrongType covers the path where a Cloneable
+// implementation returns a type that doesn't match T, falling through
+// to reflection-based cloning.
+func TestCloneCloneableReturnsWrongType(t *testing.T) {
+	original := &WrongTypeCloneable{Value: "test"}
+	cloned := Clone(original)
+
+	require.NotNil(t, cloned)
+	// The Cloneable returns a string, which can't be asserted to
+	// *WrongTypeCloneable, so it falls through to reflection cloning.
+	assert.Equal(t, "test", cloned.Value)
+}
+
+// WrongTypeCloneable implements Cloneable but returns a different type.
+type WrongTypeCloneable struct {
+	Value string
+}
+
+func (w *WrongTypeCloneable) Clone() any {
+	return "not the right type"
+}
+
+// TestCloneSliceSubSliceAliasing verifies that sub-slices sharing the
+// same backing array are not incorrectly aliased via the visited cache.
+func TestCloneSliceSubSliceAliasing(t *testing.T) {
+	type TwoSlices struct {
+		Full []any
+		Sub  []any
+	}
+
+	full := make([]any, 3, 5)
+	full[0] = "a"
+	full[1] = "b"
+	full[2] = "c"
+	sub := full[:2]
+
+	original := &TwoSlices{Full: full, Sub: sub}
+	cloned := Clone(original)
+
+	require.NotNil(t, cloned)
+	assert.Len(t, cloned.Full, 3)
+	assert.Len(t, cloned.Sub, 2)
+	assert.Equal(t, 5, cap(cloned.Full))
+	assert.Equal(t, 5, cap(cloned.Sub))
+}
