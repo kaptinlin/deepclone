@@ -6,22 +6,22 @@ A high-performance deep cloning library for Go that provides safe, efficient cop
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/deepclone)](https://goreportcard.com/report/github.com/kaptinlin/deepclone)
 
-## ✨ Features
+## Features
 
-- **🚀 High Performance**: Zero-allocation fast paths for primitive types
-- **🛡️ Circular Reference Safe**: Automatic detection and handling of circular references
-- **🔒 Thread Safe**: Concurrent operations with safe caching mechanisms
-- **📦 Universal Support**: Works with all Go types including channels, functions, and interfaces
-- **🎯 Extensible**: Custom cloning behavior via `Cloneable` interface
-- **⚡ Zero Dependencies**: Uses only Go standard library
+- **High Performance**: Zero-allocation fast paths for primitive types
+- **Circular Reference Safe**: Automatic detection and handling of circular references
+- **Thread Safe**: Concurrent operations with safe caching mechanisms
+- **Universal Support**: Works with all Go types including channels, functions, and interfaces
+- **Extensible**: Custom cloning behavior via `Cloneable` interface
+- **Zero Dependencies**: Uses only Go standard library
 
-## 📦 Installation
+## Installation
 
 ```bash
 go get github.com/kaptinlin/deepclone
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```go
 package main
@@ -37,28 +37,28 @@ func main() {
         "numbers": {1, 2, 3},
         "scores":  {85, 90, 95},
     }
-    
+
     cloned := deepclone.Clone(original)
-    
+
     // Modify original - cloned remains independent
     original["numbers"][0] = 999
-    
+
     fmt.Println("Original:", original["numbers"]) // [999, 2, 3]
     fmt.Println("Cloned:", cloned["numbers"])     // [1, 2, 3]
 }
 ```
 
-## 💡 Core Concept
+## Core Concept
 
 All operations perform **deep copies** by default:
 
-- **Primitives**: `int`, `string`, `bool` → Copied by value (zero allocations)
-- **Collections**: `slice`, `map`, `array` → New containers with cloned elements  
+- **Primitives**: `int`, `string`, `bool` -- Copied by value (zero allocations)
+- **Collections**: `slice`, `map`, `array` -- New containers with cloned elements
 - **Structs**: New instances with all fields deeply cloned
 - **Pointers**: New pointers pointing to cloned values
 - **Custom Types**: Support via `Cloneable` interface
 
-## 📚 Examples
+## Examples
 
 ### Basic Usage
 
@@ -111,7 +111,7 @@ cloned := deepclone.Clone(doc) // Version becomes 2
 
 For more examples, see **[examples/](examples/)** directory.
 
-## ⚡ Performance
+## Performance
 
 DeepClone is optimized for performance with:
 
@@ -140,7 +140,7 @@ For detailed benchmarks and comparisons with other libraries, see **[benchmarks/
 cd benchmarks && go test -bench=. -benchmem
 ```
 
-## 📖 API Reference
+## API Reference
 
 ### Core Function
 
@@ -160,27 +160,27 @@ type Cloneable interface {
 
 Implement this interface to provide custom cloning behavior for your types.
 
-## 🛠️ Advanced Features
+## Advanced Features
 
 - **Circular Reference Detection**: Prevents infinite loops in self-referencing structures
 - **Interface Preservation**: Maintains original interface types while cloning concrete values
 - **Thread Safety**: All operations are safe for concurrent use
 - **Type Caching**: Struct metadata is cached for improved performance on repeated operations
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please feel free to:
 
 - Report bugs
-- Suggest new features  
+- Suggest new features
 - Submit pull requests
 - Improve documentation
 
-## 📋 Requirements
+## Requirements
 
 - Go 1.25 or later
 - No external dependencies
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
