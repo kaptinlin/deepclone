@@ -1264,7 +1264,7 @@ func TestCloneSliceSubSliceAliasing(t *testing.T) {
 func TestCloneUnsafePointer(t *testing.T) {
 	t.Run("direct via interface", func(t *testing.T) {
 		x := 42
-		ptr := unsafe.Pointer(&x) //nolint:gosec // intentional unsafe.Pointer test
+		ptr := unsafe.Pointer(&x)
 		cloned := Clone(ptr)
 
 		// unsafe.Pointer should be copied as-is (same address).
@@ -1279,7 +1279,7 @@ func TestCloneUnsafePointer(t *testing.T) {
 
 		x := 99
 		original := WithUnsafePointer{
-			Ptr:  unsafe.Pointer(&x), //nolint:gosec // intentional unsafe.Pointer test
+			Ptr:  unsafe.Pointer(&x),
 			Name: "test",
 		}
 		cloned := Clone(original)
@@ -1297,7 +1297,7 @@ func TestCloneUnsafePointer(t *testing.T) {
 		original := WithUnsafePointer{Ptr: nil}
 		cloned := Clone(original)
 
-		assert.Equal(t, unsafe.Pointer(nil), cloned.Ptr) //nolint:gosec // intentional nil unsafe.Pointer test
+		assert.Equal(t, unsafe.Pointer(nil), cloned.Ptr)
 	})
 
 	t.Run("inside interface field", func(t *testing.T) {
@@ -1306,7 +1306,7 @@ func TestCloneUnsafePointer(t *testing.T) {
 		}
 
 		x := 7
-		ptr := unsafe.Pointer(&x) //nolint:gosec // intentional unsafe.Pointer test
+		ptr := unsafe.Pointer(&x)
 		original := WithInterface{Value: ptr}
 		cloned := Clone(original)
 

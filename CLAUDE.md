@@ -87,7 +87,7 @@ For slices, only those with element kinds that can contain cycles (pointer, inte
 
 ## Linting
 
-- golangci-lint version managed via `.golangci.version` file (currently 2.7.2)
+- golangci-lint version managed via `.golangci.version` file (currently 2.9.0)
 - 21 linters enabled (see `.golangci.yml`)
 - Test files exclude `gosec`, `noctx`, `revive`
 - All issues reported (no max-issues caps)
