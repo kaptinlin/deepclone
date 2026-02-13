@@ -340,14 +340,12 @@ func TestCacheConcurrentAccess(t *testing.T) {
 
 	const goroutines = 50
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	// Each goroutine clones all 50 types concurrently.
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			cloneManyDistinctTypes()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -364,16 +362,14 @@ func TestResetCacheConcurrent(t *testing.T) {
 
 	const goroutines = 20
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for i := range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			cloneManyDistinctTypes()
 			if i%5 == 0 {
 				ResetCache()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

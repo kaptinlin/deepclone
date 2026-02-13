@@ -54,16 +54,14 @@ func TestConcurrentCloneStructs(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				cloned := Clone(original)
 				assert.Equal(t, original, cloned)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -80,31 +78,27 @@ func TestConcurrentCloneSlices(t *testing.T) {
 	anySlice := []any{1, "two", 3.0, true, nil}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines * 3)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				c := Clone(intSlice)
 				assert.Equal(t, intSlice, c)
 				assert.Equal(t, cap(intSlice), cap(c))
 			}
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			for range iterations {
 				c := Clone(strSlice)
 				assert.Equal(t, strSlice, c)
 			}
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			for range iterations {
 				c := Clone(anySlice)
 				assert.Equal(t, anySlice, c)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -129,30 +123,26 @@ func TestConcurrentCloneMaps(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines * 3)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				c := Clone(strMap)
 				assert.Equal(t, strMap, c)
 			}
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			for range iterations {
 				c := Clone(intMap)
 				assert.Equal(t, intMap, c)
 			}
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			for range iterations {
 				c := Clone(nestedMap)
 				assert.Equal(t, nestedMap, c)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -174,11 +164,9 @@ func TestConcurrentCloneCircularRef(t *testing.T) {
 	a.Children = []*stressNode{b, c}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				cloned := Clone(a)
 				assert.Equal(t, a.ID, cloned.ID)
@@ -189,7 +177,7 @@ func TestConcurrentCloneCircularRef(t *testing.T) {
 				// Verify circular ref is preserved.
 				assert.Same(t, cloned, cloned.Next.Next.Next)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -207,17 +195,15 @@ func TestConcurrentCloneCloneable(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				cloned := Clone(original)
 				assert.Equal(t, original.Value, cloned.Value)
 				assert.Equal(t, original.Data, cloned.Data)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -294,16 +280,14 @@ func TestConcurrentCloneMixedTypes(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines * len(sources))
 
 	for _, src := range sources {
 		for range goroutines {
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for range iterations {
 					src.fn()
 				}
-			}()
+			})
 		}
 	}
 
@@ -323,11 +307,9 @@ func TestConcurrentCloneIndependence(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for i := range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for j := range iterations {
 				cloned := Clone(original)
 				// Mutate the clone — must not affect original
@@ -338,7 +320,7 @@ func TestConcurrentCloneIndependence(t *testing.T) {
 				assert.Equal(t, 1, original["a"][0])
 				assert.Len(t, original["b"], 3)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -360,11 +342,9 @@ func TestConcurrentClonePointerGraph(t *testing.T) {
 	original := Graph{A: &shared, B: &shared}
 
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				cloned := Clone(original)
 				assert.Equal(t, 99, *cloned.A)
@@ -374,7 +354,7 @@ func TestConcurrentClonePointerGraph(t *testing.T) {
 				// Independent from original.
 				assert.NotSame(t, &shared, cloned.A)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -392,16 +372,14 @@ func TestConcurrentCloneWithCacheContention(t *testing.T) {
 	// Each goroutine clones a unique struct type plus shared types,
 	// creating both cache misses and cache hits concurrently.
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 
 	for range goroutines {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			// Shared types — cache hits after first population.
 			for range 50 {
 				cloneManyDistinctTypes()
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
