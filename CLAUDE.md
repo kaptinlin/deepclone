@@ -4,7 +4,7 @@
 
 `github.com/kaptinlin/deepclone` is a high-performance deep cloning library for Go. It provides a single generic function `Clone[T any](src T) T` that creates a fully independent deep copy of any Go value, with automatic circular reference detection.
 
-- **Go version**: 1.25
+- **Go version**: 1.26
 - **Runtime dependencies**: None (standard library only)
 - **Test dependency**: `github.com/stretchr/testify`
 
