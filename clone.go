@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// A fieldAction indicates whether a struct field needs deep cloning or simple copy.
+// fieldAction indicates whether a struct field needs deep cloning or simple copy.
 type fieldAction int
 
 const (
@@ -31,7 +31,7 @@ var (
 	cacheMutex  sync.RWMutex
 )
 
-// A cloneContext tracks visited objects to prevent infinite loops in circular references.
+// cloneContext tracks visited objects to prevent infinite loops in circular references.
 type cloneContext struct {
 	visited map[uintptr]reflect.Value
 }
@@ -42,7 +42,7 @@ func newCloneContext() *cloneContext {
 	}
 }
 
-// A structTypeInfo caches per-field clone decisions for a struct type
+// structTypeInfo caches per-field clone decisions for a struct type
 // so that repeated cloning of the same type avoids redundant reflection.
 type structTypeInfo struct {
 	actions []fieldAction
@@ -335,19 +335,18 @@ func (cc *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 	}
 
 	// Create new pointer and clone the pointed value.
-	elemType := v.Type().Elem()
-	newPtr := reflect.New(elemType)
+	ptr := reflect.New(v.Type().Elem())
 
 	// Store the new pointer in visited map before cloning the element
 	// to handle self-referencing structures.
-	cc.visited[addr] = newPtr
+	cc.visited[addr] = ptr
 
-	clonedElem := cc.cloneValue(v.Elem())
-	if clonedElem.IsValid() {
-		newPtr.Elem().Set(clonedElem)
+	elem := cc.cloneValue(v.Elem())
+	if elem.IsValid() {
+		ptr.Elem().Set(elem)
 	}
 
-	return newPtr
+	return ptr
 }
 
 // cloneSlice creates a deep copy of a slice.
@@ -373,22 +372,20 @@ func (cc *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 		}
 	}
 
-	length := v.Len()
-	capacity := v.Cap()
-	newSlice := reflect.MakeSlice(v.Type(), length, capacity)
+	slice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 
 	if needsTracking {
-		cc.visited[v.Pointer()] = newSlice
+		cc.visited[v.Pointer()] = slice
 	}
 
-	for i := range length {
-		clonedElem := cc.cloneValue(v.Index(i))
-		if clonedElem.IsValid() {
-			newSlice.Index(i).Set(clonedElem)
+	for i := range v.Len() {
+		elem := cc.cloneValue(v.Index(i))
+		if elem.IsValid() {
+			slice.Index(i).Set(elem)
 		}
 	}
 
-	return newSlice
+	return slice
 }
 
 // cloneMap creates a deep copy of a map.
@@ -404,87 +401,84 @@ func (cc *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	}
 
 	// Create new map with size hint for Swiss Tables optimization.
-	size := v.Len()
-	newMap := reflect.MakeMapWithSize(v.Type(), size)
+	m := reflect.MakeMapWithSize(v.Type(), v.Len())
 
 	// Store in visited map for circular reference detection.
-	cc.visited[addr] = newMap
+	cc.visited[addr] = m
 
 	// Copy all key-value pairs with deep cloning.
 	elemType := v.Type().Elem()
 	for _, key := range v.MapKeys() {
-		clonedKey := cc.cloneValue(key)
-		clonedValue := cc.cloneValue(v.MapIndex(key))
+		k := cc.cloneValue(key)
+		val := cc.cloneValue(v.MapIndex(key))
 
-		if !clonedKey.IsValid() || !clonedValue.IsValid() {
+		if !k.IsValid() || !val.IsValid() {
 			continue
 		}
 
 		// Handle type alias conversions to prevent panic during SetMapIndex.
-		if clonedValue.Type() != elemType {
+		if val.Type() != elemType {
 			switch {
-			case clonedValue.Type().ConvertibleTo(elemType):
-				clonedValue = clonedValue.Convert(elemType)
-			case clonedValue.Type().AssignableTo(elemType):
+			case val.Type().ConvertibleTo(elemType):
+				val = val.Convert(elemType)
+			case val.Type().AssignableTo(elemType):
 				// Assignable but not convertible; allow as-is.
 			default:
 				// Incompatible types; skip entry to avoid panic.
 				continue
 			}
 		}
-		newMap.SetMapIndex(clonedKey, clonedValue)
+		m.SetMapIndex(k, val)
 	}
 
-	return newMap
+	return m
 }
 
 // cloneStruct creates a deep copy of a struct using cached type information.
 func (cc *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
-	structType := v.Type()
-	newStruct := reflect.New(structType).Elem()
-
-	info := structInfo(structType)
+	s := reflect.New(v.Type()).Elem()
+	info := structInfo(v.Type())
 
 	for i, action := range info.actions {
 		if !info.fields[i].IsExported() {
 			continue
 		}
 
-		srcField := v.Field(i)
-		dstField := newStruct.Field(i)
+		src := v.Field(i)
+		dst := s.Field(i)
 
 		switch action {
 		case copyField:
-			if dstField.CanSet() {
-				dstField.Set(srcField)
+			if dst.CanSet() {
+				dst.Set(src)
 			}
 		case cloneField:
-			clonedField := cc.cloneValue(srcField)
-			if clonedField.IsValid() && dstField.CanSet() {
+			field := cc.cloneValue(src)
+			if field.IsValid() && dst.CanSet() {
 				// Handle type alias conversions to prevent panic.
-				if clonedField.Type() != dstField.Type() && clonedField.Type().ConvertibleTo(dstField.Type()) {
-					clonedField = clonedField.Convert(dstField.Type())
+				if field.Type() != dst.Type() && field.Type().ConvertibleTo(dst.Type()) {
+					field = field.Convert(dst.Type())
 				}
-				dstField.Set(clonedField)
+				dst.Set(field)
 			}
 		}
 	}
 
-	return newStruct
+	return s
 }
 
 // cloneArray creates a deep copy of an array.
 func (cc *cloneContext) cloneArray(v reflect.Value) reflect.Value {
-	newArray := reflect.New(v.Type()).Elem()
+	arr := reflect.New(v.Type()).Elem()
 
 	for i := range v.Len() {
-		clonedElem := cc.cloneValue(v.Index(i))
-		if clonedElem.IsValid() {
-			newArray.Index(i).Set(clonedElem)
+		elem := cc.cloneValue(v.Index(i))
+		if elem.IsValid() {
+			arr.Index(i).Set(elem)
 		}
 	}
 
-	return newArray
+	return arr
 }
 
 // cloneInterface creates a deep copy of an interface value.
@@ -493,11 +487,11 @@ func (cc *cloneContext) cloneInterface(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	clonedValue := cc.cloneValue(v.Elem())
-	if clonedValue.IsValid() {
-		newInterface := reflect.New(v.Type()).Elem()
-		newInterface.Set(clonedValue)
-		return newInterface
+	val := cc.cloneValue(v.Elem())
+	if val.IsValid() {
+		iface := reflect.New(v.Type()).Elem()
+		iface.Set(val)
+		return iface
 	}
 
 	return v
