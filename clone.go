@@ -49,9 +49,9 @@ type structTypeInfo struct {
 	fields  []reflect.StructField
 }
 
-// getStructTypeInfo returns cached struct field information for the given type,
+// structInfo returns cached struct field information for the given type,
 // computing and caching it on first access.
-func getStructTypeInfo(t reflect.Type) *structTypeInfo {
+func structInfo(t reflect.Type) *structTypeInfo {
 	cacheMutex.RLock()
 	if info, exists := structCache[t]; exists {
 		cacheMutex.RUnlock()
@@ -101,8 +101,8 @@ func getStructTypeInfo(t reflect.Type) *structTypeInfo {
 	return info
 }
 
-// CacheStats returns the number of struct types currently cached (entries)
-// and the total number of cached fields across all types (fields).
+// CacheStats returns the number of struct types currently cached and
+// the total number of cached fields across all types.
 //
 // This is useful for monitoring cache growth and validating that
 // memory usage remains bounded. In practice, the entry count equals
@@ -118,11 +118,11 @@ func CacheStats() (entries, fields int) {
 	for _, info := range structCache {
 		fields += len(info.fields)
 	}
-	return entries, fields
+	return
 }
 
 // ResetCache clears the struct type cache, releasing all cached
-// reflection data. Subsequent [Clone] operations will re-populate
+// reflection data. Subsequent Clone operations will re-populate
 // the cache on demand.
 //
 // This is primarily useful in tests or long-running applications
@@ -155,8 +155,8 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 // Clone uses a hierarchical optimization strategy for maximum performance:
 //   - Primitive types (int, string, bool, etc.) return as-is with zero allocation
 //   - Common slice types ([]int, []string, []byte, etc.) use optimized generic copy
-//   - Common map types (map[string]string, etc.) use [maps.Clone]
-//   - Types implementing [Cloneable] delegate to their Clone method
+//   - Common map types (map[string]string, etc.) use maps.Clone
+//   - Types implementing Cloneable delegate to their Clone method
 //   - All other types use cached reflection with circular reference detection
 //
 // Special cases:
@@ -443,7 +443,7 @@ func (cc *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 	structType := v.Type()
 	newStruct := reflect.New(structType).Elem()
 
-	info := getStructTypeInfo(structType)
+	info := structInfo(structType)
 
 	for i, action := range info.actions {
 		if !info.fields[i].IsExported() {

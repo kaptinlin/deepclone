@@ -19,7 +19,7 @@
 //
 // Custom Cloning:
 //
-// Types that implement the [Cloneable] interface receive custom cloning
+// Types that implement the Cloneable interface receive custom cloning
 // behavior instead of the default reflection-based deep clone:
 //
 //	func (m MyStruct) Clone() any {
@@ -34,7 +34,7 @@
 // Clone uses a hierarchical optimization strategy:
 //   - Ultra-fast path: primitive types (zero allocation, direct return)
 //   - Fast path: common slice and map types (generic copy, no reflection)
-//   - Cloneable path: types implementing [Cloneable] interface
+//   - Cloneable path: types implementing Cloneable interface
 //   - Reflection path: all other types (cached struct info, circular ref detection)
 //
 // Supported Types:
@@ -43,12 +43,12 @@
 //   - Pointers and pointer chains (with circular reference detection)
 //   - Structs (with automatic field-by-field deep cloning)
 //   - Interfaces (with concrete type preservation)
-//   - Custom types implementing [Cloneable] interface
+//   - Custom types implementing Cloneable interface
 //   - Channels return zero value; functions return as-is
 //
 // Thread Safety:
 //
 // All cloning operations are safe for concurrent use. The internal struct
-// type cache uses [sync.RWMutex] with double-check locking for thread-safe
+// type cache uses sync.RWMutex with double-check locking for thread-safe
 // access without contention on the hot path.
 package deepclone
