@@ -1,7 +1,6 @@
 package deepclone
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
@@ -386,6 +385,6 @@ func TestConcurrentCloneWithCacheContention(t *testing.T) {
 
 	entries, fields := CacheStats()
 	assert.Equal(t, 50, entries,
-		fmt.Sprintf("expected 50 cache entries, got %d", entries))
+		"expected 50 cache entries, got %d", entries)
 	assert.Greater(t, fields, 0)
 }
