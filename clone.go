@@ -120,6 +120,14 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 	return cloned
 }
 
+// cloneMapExact creates a shallow copy of the map, preserving nil.
+func cloneMapExact[M ~map[K]V, K comparable, V any](m M) M {
+	if m == nil {
+		return nil
+	}
+	return maps.Clone(m)
+}
+
 // Clone creates a deep copy of the given value, preserving the complete
 // object graph including circular references.
 //
@@ -185,40 +193,19 @@ func Clone[T any](src T) T {
 	// map[string]any is excluded to handle potential circular references via reflection.
 	switch m := any(src).(type) {
 	case map[string]int:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	case map[string]string:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	case map[string]float64:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	case map[string]bool:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	case map[int]int:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	case map[int]string:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	case map[int]bool:
-		if m == nil {
-			return src
-		}
-		return any(maps.Clone(m)).(T)
+		return any(cloneMapExact(m)).(T)
 	}
 
 	// Reflection-based path for complex types.

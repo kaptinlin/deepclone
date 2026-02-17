@@ -1,0 +1,15 @@
+## Code Simplification (code-simplifying skill)
+
+### Changes applied to clone.go:
+
+1. Extracted `cloneMapExact` generic helper to eliminate repetitive nil-check + `maps.Clone` pattern
+   across 7 map fast-path cases in `Clone()`. Each case was 4 lines (nil check, return src, maps.Clone,
+   return) reduced to 1 line using the shared helper — mirrors the existing `cloneSliceExact` pattern.
+
+2. Preserved exhaustive `reflect.Kind` switch listings in `structInfo` and `cloneValue` to satisfy
+   the project's `exhaustive` linter configuration.
+
+### Verification:
+- All tests pass (`make test`)
+- All linters pass (`make lint`)
+- No behavioral changes — only implementation clarity improvements
