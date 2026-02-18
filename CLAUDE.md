@@ -9,15 +9,15 @@ High-performance deep cloning library for Go with zero-allocation fast paths and
 ## Commands
 
 ```bash
-make test              # Run tests with -race
-make test-coverage     # Generate coverage.html report
-make test-verbose      # Verbose test output with -race
+task test              # Run tests with -race
+task test-coverage     # Generate coverage.html report
+task test-verbose      # Verbose test output with -race
 make bench             # Run benchmarks
 make bench-comparison  # Compare against other libraries (benchmarks/ module)
-make lint              # golangci-lint + go mod tidy check
+task lint              # golangci-lint + go mod tidy check
 make fmt               # Format code
 make vet               # Run go vet
-make verify            # Full pipeline: deps + fmt + vet + lint + test
+task verify            # Full pipeline: deps + fmt + vet + lint + test
 ```
 
 ## Architecture
@@ -133,9 +133,9 @@ example_test.go       # Testable examples for GoDoc
 ### Running Tests
 
 ```bash
-make test              # Standard test run with -race
-make test-coverage     # Generate coverage.html
-make test-verbose      # Verbose output
+task test              # Standard test run with -race
+task test-coverage     # Generate coverage.html
+task test-verbose      # Verbose output
 make bench             # Run benchmarks
 ```
 
@@ -179,7 +179,7 @@ This library does not return errors. Invalid operations result in:
 - **Test exclusions**: `gosec`, `noctx`, `revive` disabled for `*_test.go`
 - **Issues**: No max-issues caps (all issues reported)
 
-Run `make lint` to execute golangci-lint and go mod tidy checks.
+Run `task lint` to execute golangci-lint and go mod tidy checks.
 
 
 ## Agent Skills
