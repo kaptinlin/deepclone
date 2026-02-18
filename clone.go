@@ -339,9 +339,10 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	c.visited[addr] = m
 
 	elemType := v.Type().Elem()
-	for _, key := range v.MapKeys() {
-		k := c.cloneValue(key)
-		val := c.cloneValue(v.MapIndex(key))
+	iter := v.MapRange()
+	for iter.Next() {
+		k := c.cloneValue(iter.Key())
+		val := c.cloneValue(iter.Value())
 
 		if !k.IsValid() || !val.IsValid() {
 			continue
