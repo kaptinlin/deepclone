@@ -9,7 +9,7 @@ import (
 type fieldAction int
 
 const (
-	copyField  fieldAction = iota
+	copyField fieldAction = iota
 	cloneField
 )
 

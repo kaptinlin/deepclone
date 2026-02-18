@@ -1,101 +1,202 @@
-# Project Guidelines
+# DeepClone
 
-## Overview
+High-performance deep cloning library for Go with zero-allocation fast paths and automatic circular reference detection.
 
-`github.com/kaptinlin/deepclone` is a high-performance deep cloning library for Go. It provides a single generic function `Clone[T any](src T) T` that creates a fully independent deep copy of any Go value, with automatic circular reference detection.
+**Module**: `github.com/kaptinlin/deepclone`
+**Go Version**: 1.26
+**Dependencies**: None (stdlib only, testify for tests)
 
-- **Go version**: 1.26
-- **Runtime dependencies**: None (standard library only)
-- **Test dependency**: `github.com/stretchr/testify`
-
-## Build Commands
+## Commands
 
 ```bash
-make test             # Run all tests with -race
-make test-coverage    # Tests with coverage report (coverage.html)
-make test-verbose     # Verbose test output with -race
-make lint             # golangci-lint + go mod tidy check
-make bench            # Run benchmarks
-make bench-comparison # Run comparison benchmarks against other libraries
-make fmt              # Format Go code
-make vet              # Run go vet
-make verify           # Full pipeline: deps + fmt + vet + lint + test
-```
-
-## Project Structure
-
-```
-clone.go              # Main implementation: Clone function and all cloning logic
-types.go              # Cloneable interface definition
-doc.go                # Package-level GoDoc documentation
-clone_test.go         # Unit tests (~800 lines, 95%+ coverage)
-cache_test.go         # Struct cache behavior tests
-concurrent_test.go    # Concurrent stress tests (100+ goroutines)
-benchmark_test.go     # Benchmarks using testing.B.Loop() (Go 1.24+)
-example_test.go       # Testable examples for GoDoc
-examples/             # Runnable example programs (basic, circular, custom)
-benchmarks/           # Separate module for comparison benchmarks against 4 libraries
+make test              # Run tests with -race
+make test-coverage     # Generate coverage.html report
+make test-verbose      # Verbose test output with -race
+make bench             # Run benchmarks
+make bench-comparison  # Compare against other libraries (benchmarks/ module)
+make lint              # golangci-lint + go mod tidy check
+make fmt               # Format code
+make vet               # Run go vet
+make verify            # Full pipeline: deps + fmt + vet + lint + test
 ```
 
 ## Architecture
 
-### Public API
+Single-file library (`clone.go`) with minimal surface area:
 
-There are only three exported symbols:
+```
+clone.go              # All cloning logic (432 lines)
+types.go              # Cloneable interface
+doc.go                # Package documentation
+*_test.go             # Tests (800+ lines, 95%+ coverage)
+examples/             # Runnable examples
+benchmarks/           # Separate comparison module
+```
 
-- `Clone[T any](src T) T` -- Deep clone any value
-- `Cloneable` interface -- Implement `Clone() any` for custom cloning behavior
-- `CacheStats() (entries, fields int)` / `ResetCache()` -- Struct cache observability and control
+### Public API (3 Exports Only)
 
-### Cloning Strategy (Hierarchical)
+```go
+func Clone[T any](src T) T                    // Deep clone any value
+type Cloneable interface { Clone() any }      // Custom cloning behavior
+func CacheStats() (entries, fields int)       // Cache observability
+func ResetCache()                             // Cache control (tests only)
+```
 
-Clone uses a tiered approach, checked in order:
+### Hierarchical Cloning Strategy
 
-1. **Ultra-fast path**: Primitive types (`int`, `string`, `bool`, `float`, `complex`, `uintptr`) return as-is with zero allocation.
-2. **Fast path - slices**: Common slice types (`[]int`, `[]string`, `[]byte`, `[]float64`, etc.) use a generic `cloneSliceExact` helper that preserves capacity.
-3. **Fast path - maps**: Common map types with primitive keys/values (`map[string]int`, `map[int]string`, etc.) use `maps.Clone()`. `map[string]any` is deliberately excluded to handle potential circular references via reflection.
-4. **Cloneable interface**: Types implementing `Cloneable` delegate to their `Clone()` method. Circular reference detection does not apply inside custom Clone methods.
-5. **Reflection path**: All remaining types use cached reflection with full circular reference detection.
+Clone checks these paths in order (clone.go:142-247):
 
-### Struct Cache
+1. **Ultra-fast path** (lines 144-150): Primitives (`int`, `string`, `bool`, etc.) return as-is with zero allocation
+2. **Fast path - slices** (lines 153-182): Common types (`[]int`, `[]string`, `[]byte`, etc.) use `cloneSliceExact[S, E]` generic helper that preserves capacity
+3. **Fast path - maps** (lines 186-222): Simple maps (`map[string]int`, `map[int]string`, etc.) use `maps.Clone()`. Excludes `map[string]any` to handle circular references via reflection
+4. **Cloneable interface** (lines 230-234): Types implementing `Cloneable` delegate to their `Clone()` method. Circular reference detection does NOT apply inside custom Clone methods
+5. **Reflection path** (lines 240-246): All other types use cached reflection with full circular reference detection
 
-`structCache` maps `reflect.Type` to `structTypeInfo` (per-field clone action decisions). Protected by `sync.RWMutex` with double-check locking. The cache is bounded by the number of distinct struct types in the program (compile-time determined), so LRU eviction is unnecessary.
+### Struct Cache (clone.go:16-111)
 
-### Circular Reference Detection
+- `structCache` maps `reflect.Type` → `structTypeInfo` (per-field clone actions)
+- Protected by `sync.RWMutex` with double-check locking (lines 42-55)
+- Bounded by number of distinct struct types (compile-time determined), no LRU needed
+- Each field marked as `copyField` (primitives, unexported) or `cloneField` (complex types)
 
-`cloneContext.visited` maps `uintptr` to `reflect.Value`. Pre-allocated with capacity 8. Pointers are stored in the visited map before recursing into the pointed value, so self-referencing structures resolve correctly.
+### Circular Reference Detection (clone.go:24-33, 280-301)
 
-For slices, only those with element kinds that can contain cycles (pointer, interface, slice, map, struct) are tracked. Cached slices are validated for matching length/capacity to prevent aliasing bugs.
+- `cloneContext.visited` maps `uintptr` → `reflect.Value`
+- Pre-allocated with capacity 8
+- Pointers stored in visited map BEFORE recursing (line 293) to handle self-references
+- Slices tracked only if element kind can contain cycles (pointer, interface, slice, map, struct)
+- Cached slices validated for matching length/capacity to prevent aliasing bugs (lines 316-319)
 
-### Special Cases
+## Key Types and Interfaces
+
+### Cloneable Interface (types.go:28-30)
+
+```go
+type Cloneable interface {
+    Clone() any
+}
+```
+
+Implement for custom cloning behavior. The library's circular reference detection does NOT apply inside your Clone method - handle cycles manually if needed.
+
+### Internal Types
+
+- `cloneContext`: Tracks visited objects during reflection-based cloning
+- `structTypeInfo`: Cached per-field clone actions for struct types
+- `fieldAction`: Enum (`copyField` or `cloneField`)
+
+## Coding Rules
+
+### Go 1.26 Features (Mandatory)
+
+- Use `for range N` instead of `for i := 0; i < N; i++` (clone.go:328, 408)
+- Use `b.Loop()` in benchmarks instead of `for i := 0; i < b.N; i++` (benchmark_test.go)
+- Use `reflect.MakeMapWithSize(type, size)` for map initialization (clone.go:348)
+- Use `clear(map)` for map clearing (clone.go:110)
+
+### Conventions
+
+- All tests MUST pass with `-race` flag
+- Use `any` instead of `interface{}`
+- Use `reflect.Pointer` instead of deprecated `reflect.Ptr`
+- Test assertions use `testify/assert` and `testify/require`
+- Memory independence verified with `assert.NotSame(t, &original, &cloned)`
+- No external runtime dependencies - stdlib only for core logic
+
+### Special Cases (clone.go:268-278)
 
 - **Channels**: Return zero value of same type
 - **Functions**: Return as-is (cannot be deep cloned)
 - **Nil pointers/slices/maps**: Return as-is
 - **Unexported struct fields**: Skipped (cannot access via reflection)
-- **Type aliases**: Handled via `ConvertibleTo`/`AssignableTo` checks in map and struct cloning
+- **Type aliases**: Handled via `ConvertibleTo`/`AssignableTo` checks (clone.go:361-366, 394-396)
 
-## Code Conventions
+## Testing
 
-- All tests must pass with `-race` flag
-- Benchmarks use `b.Loop()` (Go 1.24+), not `for i := 0; i < b.N; i++`
-- Use `for range N` syntax (Go 1.22+) for integer loops
-- Use `any` instead of `interface{}`
-- Use `reflect.Pointer` instead of deprecated `reflect.Ptr`
-- Test assertions use `testify/assert` and `testify/require`
-- No external runtime dependencies -- standard library only for core logic
+### Test Structure
+
+- Table-driven tests with `t.Run()` subtests
+- Concurrent tests: 100-200 goroutines, 100-500 iterations each (concurrent_test.go)
+- Cache tests use `t.Cleanup(ResetCache)` for isolation (cache_test.go)
+- Coverage target: 95%+
+
+### Test Files
+
+```
+clone_test.go         # Core cloning tests (800+ lines)
+cache_test.go         # Struct cache behavior
+concurrent_test.go    # Concurrent stress tests
+benchmark_test.go     # Performance benchmarks
+example_test.go       # Testable examples for GoDoc
+```
+
+### Running Tests
+
+```bash
+make test              # Standard test run with -race
+make test-coverage     # Generate coverage.html
+make test-verbose      # Verbose output
+make bench             # Run benchmarks
+```
+
+## Performance
+
+### Optimization Principles
+
+- **Zero allocations** for primitive types (verified by benchmarks)
+- **Fast paths** for common slice/map types avoid reflection overhead
+- **Reflection caching** for struct types (computed once per type)
+- **Capacity preservation** for slices and maps (clone.go:118, 348)
+- **Minimal overhead** for complex operations
+
+### Benchmark Results (Apple M3, darwin/arm64)
+
+| Operation | Performance | Memory | Allocations |
+|-----------|-------------|---------|-------------|
+| Primitives | 2.7-3.6 ns/op | 0 B/op | 0 allocs/op |
+| Slice (100 ints) | 200.6 ns/op | 896 B/op | 1 allocs/op |
+| Map (100 entries) | 4,299 ns/op | 3,544 B/op | 4 allocs/op |
+| Simple Struct | 248.6 ns/op | 128 B/op | 4 allocs/op |
+| Nested Struct | 1,386 ns/op | 952 B/op | 19 allocs/op |
+| Large Slice (10K) | 6,709 ns/op | 81,920 B/op | 1 allocs/op |
+
+Run `make bench-comparison` for detailed comparisons with other libraries.
+
+## Error Handling
+
+This library does not return errors. Invalid operations result in:
+
+- **Invalid values**: Return as-is
+- **Nil values**: Return as-is
+- **Channels**: Return zero value
+- **Unexported fields**: Silently skipped
+- **Type conversion failures**: Field skipped (maps/structs)
 
 ## Linting
 
-- golangci-lint version managed via `.golangci.version` file (currently 2.9.0)
-- 21 linters enabled (see `.golangci.yml`)
-- Test files exclude `gosec`, `noctx`, `revive`
-- All issues reported (no max-issues caps)
+- **Version**: Managed via `.golangci.version` (currently 2.9.0)
+- **Config**: `.golangci.yml` with 21 linters enabled
+- **Test exclusions**: `gosec`, `noctx`, `revive` disabled for `*_test.go`
+- **Issues**: No max-issues caps (all issues reported)
 
-## Testing Patterns
+Run `make lint` to execute golangci-lint and go mod tidy checks.
 
-- Table-driven tests with `t.Run()` subtests
-- Memory address assertions (`assert.NotSame`) for independence verification
-- `t.Cleanup(ResetCache)` between cache tests
-- Concurrent tests: 100-200 goroutines, 100-500 iterations each
-- Coverage target: 95%+
+
+## Agent Skills
+
+This package indexes agent skills from its own .agents/skills directory (deepclone/.agents/skills/):
+
+| Skill | When to Use |
+|-------|-------------|
+| [agent-md-creating](.agents/skills/agent-md-creating/) | Create or update CLAUDE.md and AGENTS.md instructions for this Go package. |
+| [code-simplifying](.agents/skills/code-simplifying/) | Refine recently changed Go code for clarity and consistency without behavior changes. |
+| [committing](.agents/skills/committing/) | Prepare conventional commit messages for this Go package. |
+| [dependency-selecting](.agents/skills/dependency-selecting/) | Evaluate and choose Go dependencies with alternatives and risk tradeoffs. |
+| [go-best-practices](.agents/skills/go-best-practices/) | Apply Google Go style and architecture best practices to code changes. |
+| [linting](.agents/skills/linting/) | Configure or run golangci-lint and fix lint issues in this package. |
+| [modernizing](.agents/skills/modernizing/) | Adopt newer Go language and toolchain features safely. |
+| [ralphy-initializing](.agents/skills/ralphy-initializing/) | Initialize or repair the .ralphy workflow configuration. |
+| [ralphy-todo-creating](.agents/skills/ralphy-todo-creating/) | Generate or refine TODO tracking via the Ralphy workflow. |
+| [readme-creating](.agents/skills/readme-creating/) | Create or rewrite README.md for this package. |
+| [releasing](.agents/skills/releasing/) | Prepare release and semantic version workflows for this package. |
+| [testing](.agents/skills/testing/) | Design or update tests (table-driven, fuzz, benchmark, and edge-case coverage). |
