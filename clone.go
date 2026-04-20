@@ -33,11 +33,11 @@ func newCloneContext() *cloneContext {
 }
 
 type structTypeInfo struct {
-	actions []fieldAction
-	fields  []reflect.StructField
+	actions   []fieldAction
+	numFields int
 }
 
-// structInfo returns cached struct field information for the given type,
+// structInfo returns cached struct cloning information for the given type,
 // computing and caching it on first access.
 func structInfo(t reflect.Type) *structTypeInfo {
 	cacheMutex.RLock()
@@ -56,11 +56,9 @@ func structInfo(t reflect.Type) *structTypeInfo {
 
 	numFields := t.NumField()
 	actions := make([]fieldAction, numFields)
-	fields := make([]reflect.StructField, numFields)
 
 	for i := range numFields {
 		field := t.Field(i)
-		fields[i] = field
 
 		if !field.IsExported() {
 			actions[i] = copyField
@@ -79,8 +77,8 @@ func structInfo(t reflect.Type) *structTypeInfo {
 	}
 
 	info := &structTypeInfo{
-		actions: actions,
-		fields:  fields,
+		actions:   actions,
+		numFields: numFields,
 	}
 	structCache[t] = info
 	return info
@@ -95,7 +93,7 @@ func CacheStats() (entries, fields int) {
 
 	entries = len(structCache)
 	for _, info := range structCache {
-		fields += len(info.fields)
+		fields += info.numFields
 	}
 	return
 }
@@ -368,10 +366,6 @@ func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 	info := structInfo(v.Type())
 
 	for i, action := range info.actions {
-		if !info.fields[i].IsExported() {
-			continue
-		}
-
 		src := v.Field(i)
 		dst := s.Field(i)
 

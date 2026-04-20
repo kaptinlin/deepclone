@@ -54,6 +54,32 @@ func TestCacheStatsIdempotent(t *testing.T) {
 	assert.Equal(t, 1, fields)
 }
 
+func TestCacheStatsIncludesUnexportedFields(t *testing.T) {
+	ResetCache()
+	t.Cleanup(ResetCache)
+
+	type mixedVisibility struct {
+		Visible string
+		hidden  []int
+		count   int
+	}
+
+	original := mixedVisibility{
+		Visible: "x",
+		hidden:  []int{1, 2, 3},
+		count:   7,
+	}
+	cloned := Clone(original)
+
+	assert.Equal(t, "x", cloned.Visible)
+	assert.Nil(t, cloned.hidden)
+	assert.Zero(t, cloned.count)
+
+	entries, fields := CacheStats()
+	assert.Equal(t, 1, entries)
+	assert.Equal(t, 3, fields)
+}
+
 func TestResetCache(t *testing.T) {
 	ResetCache()
 	t.Cleanup(ResetCache)
@@ -264,7 +290,7 @@ func TestCacheMemoryFootprint(t *testing.T) {
 
 	// Each structTypeInfo stores:
 	//   - []fieldAction: 24 (header) + 8*N bytes
-	//   - []reflect.StructField: 24 (header) + sizeof(StructField)*N
+	//   - numFields: 8 bytes
 	// Plus map bucket overhead per entry.
 	//
 	// For 50 types averaging ~5 fields, total should be well under 1 MB.
@@ -285,31 +311,21 @@ func TestCacheMemoryFootprint(t *testing.T) {
 // TestCachePerEntrySize provides a lower-bound estimate of per-entry
 // memory using unsafe.Sizeof on the cached data structures.
 func TestCachePerEntrySize(t *testing.T) {
-	// structTypeInfo has two slice headers (24 bytes each).
+	// structTypeInfo has one slice header and one int.
 	infoHeaderSize := unsafe.Sizeof(structTypeInfo{})
-	assert.Equal(t, uintptr(48), infoHeaderSize,
-		"structTypeInfo should be two slice headers (48 bytes)")
+	assert.Equal(t, uintptr(32), infoHeaderSize,
+		"structTypeInfo should be one slice header plus one int (32 bytes)")
 
 	// fieldAction is an int.
 	actionSize := unsafe.Sizeof(fieldAction(0))
 	assert.Equal(t, uintptr(8), actionSize)
 
-	// For a struct with 10 fields, the backing arrays cost:
+	// For a struct with 10 fields, the backing array cost is:
 	//   actions: 10 * 8 = 80 bytes
-	//   fields:  10 * sizeof(StructField)
 	// This is small and bounded.
 	t.Logf("structTypeInfo header: %d bytes", infoHeaderSize)
 	t.Logf("fieldAction size: %d bytes", actionSize)
-	t.Logf("10-field entry backing arrays: ~%d bytes",
-		10*actionSize+10*unsafe.Sizeof([1]struct {
-			Name      string
-			PkgPath   string
-			Type      uintptr // reflect.Type is an interface, approximate
-			Tag       string
-			Offset    uintptr
-			Index     [1]int
-			Anonymous bool
-		}{}[0]))
+	t.Logf("10-field entry backing arrays: ~%d bytes", 10*actionSize)
 }
 
 // TestCacheBoundedGrowth verifies that cloning the same types repeatedly
