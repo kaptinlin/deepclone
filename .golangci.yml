@@ -2,6 +2,7 @@ version: "2"
 
 run:
   timeout: 10m
+  go: "1.26.2"
   tests: true
 
 linters:
@@ -37,6 +38,15 @@ linters:
           - gosec
           - noctx
           - revive
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kaptinlin/deepclone
 
 issues:
   max-issues-per-linter: 0
