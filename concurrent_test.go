@@ -1,11 +1,13 @@
 package deepclone
 
 import (
+	"bytes"
 	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // stressNode is a linked-list node for circular reference stress tests.
@@ -25,9 +27,7 @@ type stressCloneable struct {
 }
 
 func (s stressCloneable) Clone() any {
-	data := make([]byte, len(s.Data))
-	copy(data, s.Data)
-	return stressCloneable{Value: s.Value, Data: data}
+	return stressCloneable{Value: s.Value, Data: bytes.Clone(s.Data)}
 }
 
 // TestConcurrentCloneStructs stress-tests concurrent cloning of
@@ -214,6 +214,9 @@ func TestConcurrentCloneCloneable(t *testing.T) {
 		Value: 42,
 		Data:  []byte{0xDE, 0xAD, 0xBE, 0xEF},
 	}
+
+	cloned := Clone(original)
+	require.NotSame(t, &original.Data[0], &cloned.Data[0])
 
 	var wg sync.WaitGroup
 

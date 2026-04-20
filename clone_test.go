@@ -1525,12 +1525,13 @@ func buildDeepNested(depth int) *DeepNested {
 		Meta:  map[string]int{"x": 0},
 	}
 	current := root
-	for i := 1; i < depth; i++ {
+	for i := range depth - 1 {
+		level := i + 1
 		child := &DeepNested{
-			Depth: i,
-			Data:  fmt.Sprintf("level-%d", i),
-			Tags:  []string{fmt.Sprintf("tag%da", i), fmt.Sprintf("tag%db", i)},
-			Meta:  map[string]int{"x": i},
+			Depth: level,
+			Data:  fmt.Sprintf("level-%d", level),
+			Tags:  []string{fmt.Sprintf("tag%da", level), fmt.Sprintf("tag%db", level)},
+			Meta:  map[string]int{"x": level},
 		}
 		current.Child = child
 		current = child
