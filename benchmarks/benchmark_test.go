@@ -1,9 +1,10 @@
 package benchmarks
 
 import (
-	"github.com/go-json-experiment/json"
 	"reflect"
 	"testing"
+
+	"github.com/go-json-experiment/json"
 
 	"github.com/kaptinlin/deepclone"
 
