@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,6 +33,7 @@ func (s stressCloneable) Clone() any {
 // TestConcurrentCloneStructs stress-tests concurrent cloning of
 // structs with slices and maps to verify data independence.
 func TestConcurrentCloneStructs(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 200
 
@@ -58,7 +60,9 @@ func TestConcurrentCloneStructs(t *testing.T) {
 		wg.Go(func() {
 			for range iterations {
 				cloned := Clone(original)
-				assert.Equal(t, original, cloned)
+				if diff := cmp.Diff(original, cloned); diff != "" {
+					t.Errorf("concurrent clone mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -69,6 +73,7 @@ func TestConcurrentCloneStructs(t *testing.T) {
 // TestConcurrentCloneSlices stress-tests concurrent cloning of
 // typed slices through both fast paths and reflection paths.
 func TestConcurrentCloneSlices(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 500
 
@@ -82,20 +87,26 @@ func TestConcurrentCloneSlices(t *testing.T) {
 		wg.Go(func() {
 			for range iterations {
 				c := Clone(intSlice)
-				assert.Equal(t, intSlice, c)
+				if diff := cmp.Diff(intSlice, c); diff != "" {
+					t.Errorf("int slice clone mismatch (-want +got):\n%s", diff)
+				}
 				assert.Equal(t, cap(intSlice), cap(c))
 			}
 		})
 		wg.Go(func() {
 			for range iterations {
 				c := Clone(strSlice)
-				assert.Equal(t, strSlice, c)
+				if diff := cmp.Diff(strSlice, c); diff != "" {
+					t.Errorf("string slice clone mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 		wg.Go(func() {
 			for range iterations {
 				c := Clone(anySlice)
-				assert.Equal(t, anySlice, c)
+				if diff := cmp.Diff(anySlice, c); diff != "" {
+					t.Errorf("any slice clone mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -106,6 +117,7 @@ func TestConcurrentCloneSlices(t *testing.T) {
 // TestConcurrentCloneMaps stress-tests concurrent cloning of
 // typed maps through both fast paths and reflection paths.
 func TestConcurrentCloneMaps(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 500
 
@@ -127,19 +139,25 @@ func TestConcurrentCloneMaps(t *testing.T) {
 		wg.Go(func() {
 			for range iterations {
 				c := Clone(strMap)
-				assert.Equal(t, strMap, c)
+				if diff := cmp.Diff(strMap, c); diff != "" {
+					t.Errorf("string map clone mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 		wg.Go(func() {
 			for range iterations {
 				c := Clone(intMap)
-				assert.Equal(t, intMap, c)
+				if diff := cmp.Diff(intMap, c); diff != "" {
+					t.Errorf("int map clone mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 		wg.Go(func() {
 			for range iterations {
 				c := Clone(nestedMap)
-				assert.Equal(t, nestedMap, c)
+				if diff := cmp.Diff(nestedMap, c); diff != "" {
+					t.Errorf("nested map clone mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -151,6 +169,7 @@ func TestConcurrentCloneMaps(t *testing.T) {
 // of structures with circular references to verify no infinite
 // loops or data races occur.
 func TestConcurrentCloneCircularRef(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 100
 
@@ -170,7 +189,9 @@ func TestConcurrentCloneCircularRef(t *testing.T) {
 				cloned := Clone(a)
 				assert.Equal(t, a.ID, cloned.ID)
 				assert.Equal(t, a.Name, cloned.Name)
-				assert.Equal(t, a.Tags, cloned.Tags)
+				if diff := cmp.Diff(a.Tags, cloned.Tags); diff != "" {
+					t.Errorf("circular tags mismatch (-want +got):\n%s", diff)
+				}
 				assert.Equal(t, b.ID, cloned.Next.ID)
 				assert.Equal(t, c.ID, cloned.Next.Next.ID)
 				// Verify circular ref is preserved.
@@ -185,6 +206,7 @@ func TestConcurrentCloneCircularRef(t *testing.T) {
 // TestConcurrentCloneCloneable stress-tests concurrent cloning of
 // types implementing the Cloneable interface.
 func TestConcurrentCloneCloneable(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 500
 
@@ -200,7 +222,9 @@ func TestConcurrentCloneCloneable(t *testing.T) {
 			for range iterations {
 				cloned := Clone(original)
 				assert.Equal(t, original.Value, cloned.Value)
-				assert.Equal(t, original.Data, cloned.Data)
+				if diff := cmp.Diff(original.Data, cloned.Data); diff != "" {
+					t.Errorf("cloneable data mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -212,6 +236,7 @@ func TestConcurrentCloneCloneable(t *testing.T) {
 // many different types simultaneously to exercise all code paths
 // (fast paths, Cloneable, reflection) under contention.
 func TestConcurrentCloneMixedTypes(t *testing.T) {
+	t.Parallel()
 	const goroutines = 50
 	const iterations = 200
 
@@ -242,12 +267,16 @@ func TestConcurrentCloneMixedTypes(t *testing.T) {
 		{"int_slice", func() {
 			s := []int{10, 20, 30}
 			c := Clone(s)
-			assert.Equal(t, s, c)
+			if diff := cmp.Diff(s, c); diff != "" {
+				t.Errorf("slice clone mismatch (-want +got):\n%s", diff)
+			}
 		}},
 		{"string_map", func() {
 			m := map[string]string{"k": "v"}
 			c := Clone(m)
-			assert.Equal(t, m, c)
+			if diff := cmp.Diff(m, c); diff != "" {
+				t.Errorf("map clone mismatch (-want +got):\n%s", diff)
+			}
 		}},
 		{"nested_struct", func() {
 			n := Nested{Value: 1, Data: []byte{1, 2},
@@ -274,7 +303,9 @@ func TestConcurrentCloneMixedTypes(t *testing.T) {
 		{"bool_slice", func() {
 			s := []bool{true, false, true}
 			c := Clone(s)
-			assert.Equal(t, s, c)
+			if diff := cmp.Diff(s, c); diff != "" {
+				t.Errorf("slice clone mismatch (-want +got):\n%s", diff)
+			}
 		}},
 	}
 
@@ -297,6 +328,7 @@ func TestConcurrentCloneMixedTypes(t *testing.T) {
 // concurrently are fully independent — mutations in one goroutine
 // do not affect clones in another.
 func TestConcurrentCloneIndependence(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 200
 
@@ -329,6 +361,7 @@ func TestConcurrentCloneIndependence(t *testing.T) {
 // of a shared pointer graph to verify pointer identity is preserved
 // within each clone but independent across clones.
 func TestConcurrentClonePointerGraph(t *testing.T) {
+	t.Parallel()
 	const goroutines = 100
 	const iterations = 200
 
@@ -362,6 +395,7 @@ func TestConcurrentClonePointerGraph(t *testing.T) {
 // TestConcurrentCloneWithCacheContention stress-tests the struct
 // type cache under heavy contention by cloning many distinct struct
 // types from many goroutines simultaneously.
+// This test runs serially because it asserts exact package-global cache counts.
 func TestConcurrentCloneWithCacheContention(t *testing.T) {
 	ResetCache()
 	t.Cleanup(ResetCache)

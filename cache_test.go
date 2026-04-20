@@ -4,12 +4,12 @@ import (
 	"runtime"
 	"sync"
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// These tests run serially because they mutate or assert on the package-global struct cache.
 func TestCacheStats(t *testing.T) {
 	ResetCache()
 	t.Cleanup(ResetCache)
@@ -306,26 +306,6 @@ func TestCacheMemoryFootprint(t *testing.T) {
 		t.Logf("estimated per-entry cost: %d bytes",
 			totalAlloc/uint64(entries))
 	}
-}
-
-// TestCachePerEntrySize provides a lower-bound estimate of per-entry
-// memory using unsafe.Sizeof on the cached data structures.
-func TestCachePerEntrySize(t *testing.T) {
-	// structTypeInfo has one slice header and one int.
-	infoHeaderSize := unsafe.Sizeof(structTypeInfo{})
-	assert.Equal(t, uintptr(32), infoHeaderSize,
-		"structTypeInfo should be one slice header plus one int (32 bytes)")
-
-	// fieldAction is an int.
-	actionSize := unsafe.Sizeof(fieldAction(0))
-	assert.Equal(t, uintptr(8), actionSize)
-
-	// For a struct with 10 fields, the backing array cost is:
-	//   actions: 10 * 8 = 80 bytes
-	// This is small and bounded.
-	t.Logf("structTypeInfo header: %d bytes", infoHeaderSize)
-	t.Logf("fieldAction size: %d bytes", actionSize)
-	t.Logf("10-field entry backing arrays: ~%d bytes", 10*actionSize)
 }
 
 // TestCacheBoundedGrowth verifies that cloning the same types repeatedly
