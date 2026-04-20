@@ -7,21 +7,22 @@ import (
 	"github.com/kaptinlin/deepclone"
 )
 
+// Node is used in the circular-reference example.
 type Node struct {
-	ID   int
+	// ID identifies the node in the example output.
+	ID int
+	// Next points to the next node in the cycle.
 	Next *Node
 }
 
 func main() {
 	fmt.Println("=== Circular Reference Example ===")
 
-	// Create circular reference
 	node1 := &Node{ID: 1}
 	node2 := &Node{ID: 2}
 	node1.Next = node2
 	node2.Next = node1
 
-	// Clone safely
 	cloned := deepclone.Clone(node1)
 
 	fmt.Printf("Original: %d -> %d -> %d\n",

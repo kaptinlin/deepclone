@@ -7,21 +7,27 @@ import (
 	"github.com/kaptinlin/deepclone"
 )
 
-// User demonstrates struct cloning
+// User is used in the struct-cloning example.
 type User struct {
-	Name     string
-	Age      int
-	Friends  []string
+	// Name is the user's display name.
+	Name string
+	// Age is the user's age.
+	Age int
+	// Friends lists related users.
+	Friends []string
+	// Metadata stores additional example attributes.
 	Metadata map[string]any
 }
 
-// CustomData demonstrates Cloneable interface
+// CustomData shows how Cloneable can customize cloning.
 type CustomData struct {
+	// Value is cloned without modification.
 	Value string
+	// Count is incremented by Clone.
 	Count int
 }
 
-// Clone implements the Cloneable interface
+// Clone increments Count to show custom clone behavior.
 func (c CustomData) Clone() any {
 	return CustomData{
 		Value: c.Value,
@@ -32,22 +38,19 @@ func (c CustomData) Clone() any {
 func main() {
 	fmt.Println("=== DeepClone Basic Examples ===")
 
-	// Example 1: Basic types
 	fmt.Println("1. Basic types:")
 	original := 42
 	cloned := deepclone.Clone(original)
 	fmt.Printf("Original: %d, Cloned: %d\n\n", original, cloned)
 
-	// Example 2: Slices
 	fmt.Println("2. Slices:")
 	originalSlice := []int{1, 2, 3, 4, 5}
 	clonedSlice := deepclone.Clone(originalSlice)
 
-	originalSlice[0] = 999 // Modify original
+	originalSlice[0] = 999
 	fmt.Printf("Original: %v\n", originalSlice)
 	fmt.Printf("Cloned:   %v\n\n", clonedSlice)
 
-	// Example 3: Maps
 	fmt.Println("3. Maps:")
 	originalMap := map[string]int{
 		"apple":  1,
@@ -56,21 +59,19 @@ func main() {
 	}
 	clonedMap := deepclone.Clone(originalMap)
 
-	originalMap["grape"] = 4 // Modify original
+	originalMap["grape"] = 4
 	fmt.Printf("Original: %v\n", originalMap)
 	fmt.Printf("Cloned:   %v\n\n", clonedMap)
 
-	// Example 4: Pointers
 	fmt.Println("4. Pointers:")
 	value := 100
 	originalPtr := &value
 	clonedPtr := deepclone.Clone(originalPtr)
 
-	*originalPtr = 200 // Modify original
+	*originalPtr = 200
 	fmt.Printf("Original: %d (addr: %p)\n", *originalPtr, originalPtr)
 	fmt.Printf("Cloned:   %d (addr: %p)\n\n", *clonedPtr, clonedPtr)
 
-	// Example 5: Structs
 	fmt.Println("5. Structs:")
 	originalUser := User{
 		Name:    "John Doe",
@@ -83,7 +84,6 @@ func main() {
 	}
 	clonedUser := deepclone.Clone(originalUser)
 
-	// Modify original
 	originalUser.Name = "Jane Doe"
 	originalUser.Friends[0] = "Charlie"
 	originalUser.Metadata["score"] = 95.0
@@ -91,7 +91,6 @@ func main() {
 	fmt.Printf("Original: %+v\n", originalUser)
 	fmt.Printf("Cloned:   %+v\n\n", clonedUser)
 
-	// Example 6: Custom Cloneable interface
 	fmt.Println("6. Custom Cloneable interface:")
 	originalCustom := CustomData{Value: "test", Count: 1}
 	clonedCustom := deepclone.Clone(originalCustom)

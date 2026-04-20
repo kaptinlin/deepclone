@@ -14,14 +14,11 @@ const (
 )
 
 var (
-	// structCache caches struct type information keyed by reflect.Type.
-	// Bounded by the number of distinct struct types in the program.
-	// Use ResetCache to reclaim memory if needed (e.g., in tests).
+	// structCache is bounded by the number of distinct struct types seen.
 	structCache = make(map[reflect.Type]*structTypeInfo)
 	cacheMutex  sync.RWMutex
 )
 
-// cloneContext tracks visited objects to detect circular references.
 type cloneContext struct {
 	visited map[uintptr]reflect.Value
 }
@@ -37,8 +34,6 @@ type structTypeInfo struct {
 	numFields int
 }
 
-// structInfo returns cached struct cloning information for the given type,
-// computing and caching it on first access.
 func structInfo(t reflect.Type) *structTypeInfo {
 	cacheMutex.RLock()
 	if info, exists := structCache[t]; exists {
@@ -84,9 +79,7 @@ func structInfo(t reflect.Type) *structTypeInfo {
 	return info
 }
 
-// CacheStats returns the number of struct types currently cached and
-// the total number of cached fields across all types.
-// CacheStats is safe for concurrent use.
+// CacheStats returns the number of cached struct types and fields.
 func CacheStats() (entries, fields int) {
 	cacheMutex.RLock()
 	defer cacheMutex.RUnlock()
@@ -98,9 +91,7 @@ func CacheStats() (entries, fields int) {
 	return
 }
 
-// ResetCache clears the struct type cache. Subsequent Clone operations
-// will re-populate the cache on demand.
-// ResetCache is safe for concurrent use.
+// ResetCache clears the cached struct metadata.
 func ResetCache() {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
@@ -108,7 +99,6 @@ func ResetCache() {
 	clear(structCache)
 }
 
-// cloneSliceExact creates a copy of the slice with exact capacity preservation.
 func cloneSliceExact[S ~[]E, E any](s S) S {
 	if s == nil {
 		return nil
@@ -118,7 +108,6 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 	return cloned
 }
 
-// cloneMapExact creates a shallow copy of the map, preserving nil.
 func cloneMapExact[M ~map[K]V, K comparable, V any](m M) M {
 	if m == nil {
 		return nil
@@ -126,27 +115,11 @@ func cloneMapExact[M ~map[K]V, K comparable, V any](m M) M {
 	return maps.Clone(m)
 }
 
-// Clone creates a deep copy of the given value, preserving the complete
-// object graph including circular references.
+// Clone returns a deep copy of src.
 //
-// Clone uses a hierarchical optimization strategy for maximum performance:
-//   - Primitive types (int, string, bool, etc.) return as-is with zero allocation
-//   - Common slice types ([]int, []string, []byte, etc.) use optimized generic copy
-//   - Common map types (map[string]string, etc.) use maps.Clone
-//   - Types implementing Cloneable delegate to their Clone method
-//   - All other types use cached reflection with circular reference detection
-//
-// Special cases:
-//   - nil values return as-is
-//   - Channels return the zero value of their type
-//   - Functions return as-is (cannot be deep cloned)
-//   - Slice capacity and map size hints are preserved
-//
-// Usage:
-//
-//	dst := deepclone.Clone(src)
+// Clone preserves circular references when it uses reflection. Types that
+// implement Cloneable control their own cloning behavior.
 func Clone[T any](src T) T {
-	// Fast path: primitive types are value types, return as-is.
 	switch any(src).(type) {
 	case bool, int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64, uintptr,
@@ -155,7 +128,6 @@ func Clone[T any](src T) T {
 		return src
 	}
 
-	// Fast path: common slice types using generic copy with exact capacity.
 	switch s := any(src).(type) {
 	case []int:
 		return any(cloneSliceExact(s)).(T)
@@ -187,8 +159,7 @@ func Clone[T any](src T) T {
 		return any(cloneSliceExact(s)).(T)
 	}
 
-	// Fast path: simple map types using maps.Clone.
-	// map[string]any is excluded to handle potential circular references via reflection.
+	// map[string]any is excluded so reflection can preserve circular references.
 	switch m := any(src).(type) {
 	case map[string]int:
 		return any(cloneMapExact(m)).(T)
@@ -206,7 +177,6 @@ func Clone[T any](src T) T {
 		return any(cloneMapExact(m)).(T)
 	}
 
-	// Reflection-based path for complex types.
 	v := reflect.ValueOf(src)
 	if !v.IsValid() {
 		return src
@@ -231,7 +201,6 @@ func Clone[T any](src T) T {
 	return src
 }
 
-// cloneValue performs deep cloning of v using reflection.
 func (c *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 	if !v.IsValid() {
 		return reflect.Value{}
@@ -262,7 +231,6 @@ func (c *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 	return v
 }
 
-// clonePointer creates a deep copy of a pointer value, handling circular references.
 func (c *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 	if v.IsNil() {
 		return v
@@ -286,7 +254,6 @@ func (c *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 	return ptr
 }
 
-// cloneSlice creates a deep copy of a slice, preserving capacity and handling circular references.
 func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 	if v.IsNil() {
 		return v
@@ -322,7 +289,6 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 	return slice
 }
 
-// cloneMap creates a deep copy of a map, handling circular references and type conversions.
 func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	if v.IsNil() {
 		return v
@@ -360,7 +326,6 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	return m
 }
 
-// cloneStruct creates a deep copy of a struct, using cached field information for performance.
 func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 	s := reflect.New(v.Type()).Elem()
 	info := structInfo(v.Type())
@@ -388,7 +353,6 @@ func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 	return s
 }
 
-// cloneArray creates a deep copy of an array.
 func (c *cloneContext) cloneArray(v reflect.Value) reflect.Value {
 	arr := reflect.New(v.Type()).Elem()
 
@@ -402,7 +366,6 @@ func (c *cloneContext) cloneArray(v reflect.Value) reflect.Value {
 	return arr
 }
 
-// cloneInterface creates a deep copy of an interface value, preserving the concrete type.
 func (c *cloneContext) cloneInterface(v reflect.Value) reflect.Value {
 	if v.IsNil() {
 		return v
