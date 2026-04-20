@@ -1258,6 +1258,18 @@ func TestCloneSliceSubSliceAliasing(t *testing.T) {
 	assert.Equal(t, 5, cap(cloned.Sub))
 }
 
+type panicCloneable struct{}
+
+func (panicCloneable) Clone() any {
+	panic("boom")
+}
+
+func TestCloneablePanicPropagates(t *testing.T) {
+	assert.PanicsWithValue(t, "boom", func() {
+		Clone(panicCloneable{})
+	})
+}
+
 // TestCloneUnsafePointer covers the unsafe.Pointer as-is return path
 // in cloneValue. unsafe.Pointer is an opaque type that cannot be
 // meaningfully deep cloned, so it is copied by value (same address).

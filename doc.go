@@ -48,7 +48,8 @@
 //
 // Thread Safety:
 //
-// All cloning operations are safe for concurrent use. The internal struct
-// type cache uses sync.RWMutex with double-check locking for thread-safe
-// access without contention on the hot path.
+// The internal struct cache is safe for concurrent use. Clone is safe to call
+// from multiple goroutines as long as callers do not mutate the same source map
+// while it is being cloned. The package does not recover from panics raised by
+// custom Cloneable implementations.
 package deepclone
