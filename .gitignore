@@ -81,6 +81,12 @@ mem.prof
 profile.out
 
 # Scratch/planning docs
+.workspace
+task.md
+.cov.before
+.cov.after
+.fix.before*
+.fix.after*
 .plans/
 .plans/*
 .plan/*.md
