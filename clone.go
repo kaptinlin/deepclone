@@ -30,8 +30,7 @@ func newCloneContext() *cloneContext {
 }
 
 type structTypeInfo struct {
-	actions   []fieldAction
-	numFields int
+	actions []fieldAction
 }
 
 func structInfo(t reflect.Type) *structTypeInfo {
@@ -71,10 +70,7 @@ func structInfo(t reflect.Type) *structTypeInfo {
 		}
 	}
 
-	info := &structTypeInfo{
-		actions:   actions,
-		numFields: numFields,
-	}
+	info := &structTypeInfo{actions: actions}
 	structCache[t] = info
 	return info
 }
@@ -86,7 +82,7 @@ func CacheStats() (entries, fields int) {
 
 	entries = len(structCache)
 	for _, info := range structCache {
-		fields += info.numFields
+		fields += len(info.actions)
 	}
 	return
 }
@@ -106,13 +102,6 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 	cloned := make(S, len(s), cap(s))
 	copy(cloned, s)
 	return cloned
-}
-
-func cloneMapExact[M ~map[K]V, K comparable, V any](m M) M {
-	if m == nil {
-		return nil
-	}
-	return maps.Clone(m)
 }
 
 // Clone returns a deep copy of src.
@@ -162,19 +151,19 @@ func Clone[T any](src T) T {
 	// map[string]any is excluded so reflection can preserve circular references.
 	switch m := any(src).(type) {
 	case map[string]int:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	case map[string]string:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	case map[string]float64:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	case map[string]bool:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	case map[int]int:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	case map[int]string:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	case map[int]bool:
-		return any(cloneMapExact(m)).(T)
+		return any(maps.Clone(m)).(T)
 	}
 
 	v := reflect.ValueOf(src)
