@@ -54,19 +54,8 @@ func structInfo(t reflect.Type) *structTypeInfo {
 	for i := range numFields {
 		field := t.Field(i)
 
-		if !field.IsExported() {
-			actions[i] = copyField
-			continue
-		}
-
-		switch field.Type.Kind() {
-		case reflect.Slice, reflect.Map, reflect.Pointer, reflect.Interface, reflect.Array, reflect.Struct:
+		if field.IsExported() && shouldCloneKind(field.Type.Kind()) {
 			actions[i] = cloneField
-		case reflect.Invalid, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
-			reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128,
-			reflect.Chan, reflect.Func, reflect.String, reflect.UnsafePointer:
-			actions[i] = copyField
 		}
 	}
 
@@ -102,6 +91,26 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 	cloned := make(S, len(s), cap(s))
 	copy(cloned, s)
 	return cloned
+}
+
+func shouldCloneKind(kind reflect.Kind) bool {
+	return kind == reflect.Slice || kind == reflect.Map || kind == reflect.Pointer ||
+		kind == reflect.Interface || kind == reflect.Array || kind == reflect.Struct
+}
+
+func sliceCanContainCycles(kind reflect.Kind) bool {
+	return kind == reflect.Pointer || kind == reflect.Interface || kind == reflect.Slice ||
+		kind == reflect.Map || kind == reflect.Struct
+}
+
+func assignableClone(value reflect.Value, target reflect.Type) (reflect.Value, bool) {
+	if value.Type() == target || value.Type().AssignableTo(target) {
+		return value, true
+	}
+	if value.Type().ConvertibleTo(target) {
+		return value.Convert(target), true
+	}
+	return reflect.Value{}, false
 }
 
 // Clone returns a deep copy of src.
@@ -249,9 +258,7 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 	}
 
 	// Only track slices whose elements can contain cycles.
-	elemKind := v.Type().Elem().Kind()
-	needsTracking := elemKind == reflect.Pointer || elemKind == reflect.Interface ||
-		elemKind == reflect.Slice || elemKind == reflect.Map || elemKind == reflect.Struct
+	needsTracking := sliceCanContainCycles(v.Type().Elem().Kind())
 
 	if needsTracking {
 		addr := v.Pointer()
@@ -301,13 +308,9 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 			continue
 		}
 
-		// Handle type alias conversions to prevent panic during SetMapIndex.
-		if val.Type() != elemType {
-			if val.Type().ConvertibleTo(elemType) {
-				val = val.Convert(elemType)
-			} else if !val.Type().AssignableTo(elemType) {
-				continue
-			}
+		val, ok := assignableClone(val, elemType)
+		if !ok {
+			continue
 		}
 		m.SetMapIndex(k, val)
 	}
@@ -331,10 +334,9 @@ func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 		case cloneField:
 			clonedField := c.cloneValue(src)
 			if clonedField.IsValid() && dst.CanSet() {
-				if clonedField.Type() != dst.Type() && clonedField.Type().ConvertibleTo(dst.Type()) {
-					clonedField = clonedField.Convert(dst.Type())
+				if clonedField, ok := assignableClone(clonedField, dst.Type()); ok {
+					dst.Set(clonedField)
 				}
-				dst.Set(clonedField)
 			}
 		}
 	}

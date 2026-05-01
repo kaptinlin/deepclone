@@ -7,31 +7,22 @@ import (
 	"github.com/kaptinlin/deepclone"
 )
 
-// User is used in the struct-cloning example.
-type User struct {
-	// Name is the user's display name.
-	Name string
-	// Age is the user's age.
-	Age int
-	// Friends lists related users.
-	Friends []string
-	// Metadata stores additional example attributes.
+type user struct {
+	Name     string
+	Age      int
+	Friends  []string
 	Metadata map[string]any
 }
 
-// CustomData shows how Cloneable can customize cloning.
-type CustomData struct {
-	// Value is cloned without modification.
+type customData struct {
 	Value string
-	// Count is incremented by Clone.
 	Count int
 }
 
-// Clone increments Count to show custom clone behavior.
-func (c CustomData) Clone() any {
-	return CustomData{
+func (c customData) Clone() any {
+	return customData{
 		Value: c.Value,
-		Count: c.Count + 1, // Increment count on clone
+		Count: c.Count + 1,
 	}
 }
 
@@ -73,7 +64,7 @@ func main() {
 	fmt.Printf("Cloned:   %d (addr: %p)\n\n", *clonedPtr, clonedPtr)
 
 	fmt.Println("5. Structs:")
-	originalUser := User{
+	originalUser := user{
 		Name:    "John Doe",
 		Age:     30,
 		Friends: []string{"Alice", "Bob"},
@@ -92,7 +83,7 @@ func main() {
 	fmt.Printf("Cloned:   %+v\n\n", clonedUser)
 
 	fmt.Println("6. Custom Cloneable interface:")
-	originalCustom := CustomData{Value: "test", Count: 1}
+	originalCustom := customData{Value: "test", Count: 1}
 	clonedCustom := deepclone.Clone(originalCustom)
 
 	fmt.Printf("Original: %+v\n", originalCustom)
