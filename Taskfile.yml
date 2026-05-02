@@ -120,11 +120,6 @@ tasks:
       - go mod tidy
       - git diff --exit-code -- go.mod go.sum || (echo "go.mod or go.sum is not tidy" && exit 1)
 
-  markdownlint:
-    desc: Run markdownlint
-    cmds:
-      - markdownlint-cli2 "**/*.md"
-
   yamllint:
     desc: Run yamllint
     cmds:
