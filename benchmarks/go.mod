@@ -3,7 +3,7 @@ module github.com/kaptinlin/deepclone/benchmarks
 go 1.26.2
 
 require (
-	github.com/go-json-experiment/json v0.0.0-20260430182902-b6187a392ed4
+	github.com/go-json-experiment/json v0.0.0-20260504200034-64a0a05799db
 	github.com/huandu/go-clone v1.7.3
 	github.com/jinzhu/copier v0.4.0
 	github.com/kaptinlin/deepclone v0.2.13
