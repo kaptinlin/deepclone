@@ -153,8 +153,6 @@ func Clone[T any](src T) T {
 		return any(cloneSliceExact(s)).(T)
 	case []bool:
 		return any(cloneSliceExact(s)).(T)
-	case []byte:
-		return any(cloneSliceExact(s)).(T)
 	}
 
 	// map[string]any is excluded so reflection can preserve circular references.
