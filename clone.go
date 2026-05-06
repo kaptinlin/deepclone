@@ -48,14 +48,11 @@ func structInfo(t reflect.Type) *structTypeInfo {
 		return info
 	}
 
-	numFields := t.NumField()
-	actions := make([]fieldAction, numFields)
+	actions := make([]fieldAction, t.NumField())
 
-	for i := range numFields {
-		field := t.Field(i)
-
+	for field := range t.Fields() {
 		if field.IsExported() && shouldCloneKind(field.Type.Kind()) {
-			actions[i] = cloneField
+			actions[field.Index[0]] = cloneField
 		}
 	}
 
