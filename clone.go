@@ -101,10 +101,11 @@ func sliceCanContainCycles(kind reflect.Kind) bool {
 }
 
 func assignableClone(value reflect.Value, target reflect.Type) (reflect.Value, bool) {
-	if value.Type() == target || value.Type().AssignableTo(target) {
+	valueType := value.Type()
+	if valueType == target || valueType.AssignableTo(target) {
 		return value, true
 	}
-	if value.Type().ConvertibleTo(target) {
+	if valueType.ConvertibleTo(target) {
 		return value.Convert(target), true
 	}
 	return reflect.Value{}, false
@@ -234,17 +235,17 @@ func (c *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 		return cloned
 	}
 
-	ptr := reflect.New(v.Type().Elem())
+	clonedPtr := reflect.New(v.Type().Elem())
 
 	// Register before recursing to handle self-referencing structures.
-	c.visited[addr] = ptr
+	c.visited[addr] = clonedPtr
 
 	elem := c.cloneValue(v.Elem())
 	if elem.IsValid() {
-		ptr.Elem().Set(elem)
+		clonedPtr.Elem().Set(elem)
 	}
 
-	return ptr
+	return clonedPtr
 }
 
 func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
@@ -252,7 +253,6 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	// Only track slices whose elements can contain cycles.
 	needsTracking := sliceCanContainCycles(v.Type().Elem().Kind())
 
 	if needsTracking {
@@ -264,20 +264,20 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 		}
 	}
 
-	slice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
+	clonedSlice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 
 	if needsTracking {
-		c.visited[v.Pointer()] = slice
+		c.visited[v.Pointer()] = clonedSlice
 	}
 
 	for i := range v.Len() {
 		elem := c.cloneValue(v.Index(i))
 		if elem.IsValid() {
-			slice.Index(i).Set(elem)
+			clonedSlice.Index(i).Set(elem)
 		}
 	}
 
-	return slice
+	return clonedSlice
 }
 
 func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
@@ -290,36 +290,36 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 		return cloned
 	}
 
-	m := reflect.MakeMapWithSize(v.Type(), v.Len())
-	c.visited[addr] = m
+	clonedMap := reflect.MakeMapWithSize(v.Type(), v.Len())
+	c.visited[addr] = clonedMap
 
 	elemType := v.Type().Elem()
 	iter := v.MapRange()
 	for iter.Next() {
-		k := c.cloneValue(iter.Key())
-		val := c.cloneValue(iter.Value())
+		key := c.cloneValue(iter.Key())
+		value := c.cloneValue(iter.Value())
 
-		if !k.IsValid() || !val.IsValid() {
+		if !key.IsValid() || !value.IsValid() {
 			continue
 		}
 
-		val, ok := assignableClone(val, elemType)
+		value, ok := assignableClone(value, elemType)
 		if !ok {
 			continue
 		}
-		m.SetMapIndex(k, val)
+		clonedMap.SetMapIndex(key, value)
 	}
 
-	return m
+	return clonedMap
 }
 
 func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
-	s := reflect.New(v.Type()).Elem()
+	clonedStruct := reflect.New(v.Type()).Elem()
 	info := structInfo(v.Type())
 
 	for i, action := range info.actions {
 		src := v.Field(i)
-		dst := s.Field(i)
+		dst := clonedStruct.Field(i)
 
 		switch action {
 		case copyField:
@@ -336,20 +336,20 @@ func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 		}
 	}
 
-	return s
+	return clonedStruct
 }
 
 func (c *cloneContext) cloneArray(v reflect.Value) reflect.Value {
-	arr := reflect.New(v.Type()).Elem()
+	clonedArray := reflect.New(v.Type()).Elem()
 
 	for i := range v.Len() {
 		elem := c.cloneValue(v.Index(i))
 		if elem.IsValid() {
-			arr.Index(i).Set(elem)
+			clonedArray.Index(i).Set(elem)
 		}
 	}
 
-	return arr
+	return clonedArray
 }
 
 func (c *cloneContext) cloneInterface(v reflect.Value) reflect.Value {
@@ -358,11 +358,11 @@ func (c *cloneContext) cloneInterface(v reflect.Value) reflect.Value {
 	}
 
 	clonedElem := c.cloneValue(v.Elem())
-	if clonedElem.IsValid() {
-		iface := reflect.New(v.Type()).Elem()
-		iface.Set(clonedElem)
-		return iface
+	if !clonedElem.IsValid() {
+		return v
 	}
 
-	return v
+	iface := reflect.New(v.Type()).Elem()
+	iface.Set(clonedElem)
+	return iface
 }
