@@ -174,7 +174,7 @@ This library does not return errors. Invalid operations result in:
 
 ## Linting
 
-- **Version**: Managed via `.golangci.version` (currently 2.9.0)
+- **Version**: Managed via `.golangci.version` (currently 2.12.2)
 - **Config**: `.golangci.yml` with 21 linters enabled
 - **Test exclusions**: `gosec`, `noctx`, `revive` disabled for `*_test.go`
 - **Issues**: No max-issues caps (all issues reported)
