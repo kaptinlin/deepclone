@@ -356,6 +356,36 @@ func TestCloneMaps(t *testing.T) {
 		}
 		assert.Len(t, cloned, 0)
 	})
+
+	t.Run("pointer keys are cloned", func(t *testing.T) {
+		t.Parallel()
+		type Key struct{ ID int }
+
+		originalKey := &Key{ID: 1}
+		original := map[*Key][]int{originalKey: {1, 2, 3}}
+		cloned := Clone(original)
+
+		require.Len(t, cloned, 1)
+
+		var clonedKey *Key
+		var clonedValue []int
+		for key, value := range cloned {
+			clonedKey = key
+			clonedValue = value
+		}
+
+		require.NotNil(t, clonedKey)
+		assert.NotSame(t, originalKey, clonedKey)
+		assert.Equal(t, originalKey.ID, clonedKey.ID)
+		if diff := cmp.Diff([]int{1, 2, 3}, clonedValue); diff != "" {
+			t.Errorf("cloned map value mismatch (-want +got):\n%s", diff)
+		}
+
+		originalKey.ID = 99
+		original[originalKey][0] = 99
+		assert.Equal(t, 1, clonedKey.ID)
+		assert.Equal(t, 1, clonedValue[0])
+	})
 }
 
 func TestClonePointers(t *testing.T) {
