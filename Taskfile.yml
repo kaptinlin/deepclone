@@ -115,22 +115,29 @@ tasks:
 
   lint:
     desc: Run all linters
-    deps:
-      - golangci-lint
-      - tidy-lint
+    cmds:
+      - task: golangci-lint
+      - task: tidy-lint
 
   install-golangci-lint:
     desc: Install golangci-lint with the required version
     cmds:
-      - mkdir -p {{.GOBIN}}
+      - mkdir -p "{{.GOBIN}}"
       - |
+        set -e
         if [ "{{.GOLANGCI_LINT_VERSION}}" != "{{.REQUIRED_GOLANGCI_LINT_VERSION}}" ]; then
           echo "Installing golangci-lint v{{.REQUIRED_GOLANGCI_LINT_VERSION}} (current: {{.GOLANGCI_LINT_VERSION}})..."
-          GOBIN={{.GOBIN}} go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v{{.REQUIRED_GOLANGCI_LINT_VERSION}}
-          echo "golangci-lint v{{.REQUIRED_GOLANGCI_LINT_VERSION}} installed successfully"
+          GOBIN="{{.GOBIN}}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v{{.REQUIRED_GOLANGCI_LINT_VERSION}}
         else
           echo "golangci-lint v{{.REQUIRED_GOLANGCI_LINT_VERSION}} already installed"
         fi
+
+        installed_version="$("{{.GOLANGCI_LINT_BINARY}}" version --format short 2>/dev/null || "{{.GOLANGCI_LINT_BINARY}}" version --short 2>/dev/null || true)"
+        if [ "$installed_version" != "{{.REQUIRED_GOLANGCI_LINT_VERSION}}" ]; then
+          echo "golangci-lint version mismatch: expected {{.REQUIRED_GOLANGCI_LINT_VERSION}}, got ${installed_version:-not-installed}"
+          exit 1
+        fi
+        echo "golangci-lint v{{.REQUIRED_GOLANGCI_LINT_VERSION}} is ready"
     status:
       - test "{{.GOLANGCI_LINT_VERSION}}" = "{{.REQUIRED_GOLANGCI_LINT_VERSION}}"
 
@@ -140,16 +147,29 @@ tasks:
       - install-golangci-lint
     cmds:
       - echo "Running {{.GOLANGCI_LINT_BINARY}} version"
-      - '{{.GOLANGCI_LINT_BINARY}} version'
+      - '"{{.GOLANGCI_LINT_BINARY}}" version'
       - echo "Running golangci-lint..."
-      - '{{.GOLANGCI_LINT_BINARY}} run --timeout=10m'
+      - '"{{.GOLANGCI_LINT_BINARY}}" run --timeout=10m'
 
   tidy-lint:
     desc: Check if go.mod and go.sum are tidy
     cmds:
       - echo "Checking go mod tidy..."
-      - go mod tidy
-      - git diff --exit-code -- go.mod go.sum || (echo "go.mod or go.sum is not tidy" && exit 1)
+      - |
+        set -e
+        before=$(mktemp)
+        after=$(mktemp)
+        trap 'rm -f "$before" "$after"' EXIT
+
+        git diff -- go.mod go.sum > "$before"
+        go mod tidy
+        git diff -- go.mod go.sum > "$after"
+
+        if ! cmp -s "$before" "$after"; then
+          echo "go.mod or go.sum is not tidy"
+          git diff -- go.mod go.sum
+          exit 1
+        fi
 
   yamllint:
     desc: Run yamllint
