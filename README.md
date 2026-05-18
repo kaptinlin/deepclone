@@ -2,7 +2,7 @@
 
 A high-performance deep cloning library for Go that provides safe, efficient copying of any Go value.
 
-[![Go Version](https://img.shields.io/badge/go-%3E%3D1.26-blue)](https://golang.org/dl/)
+[![Go Module](https://img.shields.io/badge/go-module-blue)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/deepclone)](https://goreportcard.com/report/github.com/kaptinlin/deepclone)
 

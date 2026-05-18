@@ -3,7 +3,7 @@
 High-performance deep cloning library for Go with zero-allocation fast paths and automatic circular reference detection.
 
 **Module**: `github.com/kaptinlin/deepclone`
-**Go Version**: 1.26
+**Go version**: see `go.mod`
 **Dependencies**: None (stdlib only, testify for tests)
 
 ## Commands
@@ -87,7 +87,7 @@ Implement for custom cloning behavior. The library's circular reference detectio
 
 ## Coding Rules
 
-### Go 1.26 Features (Mandatory)
+### Features Available Under the Declared Go Version
 
 - Use `for range N` instead of `for i := 0; i < N; i++` (clone.go:328, 408)
 - Use `b.Loop()` in benchmarks instead of `for i := 0; i < b.N; i++` (benchmark_test.go)

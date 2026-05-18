@@ -65,6 +65,7 @@ TODO*.md
 .env.*.local
 .env.local
 .vscode/
+.claude/
 Desktop.ini
 Thumbs.db
 \#*\#
