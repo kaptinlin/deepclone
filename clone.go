@@ -254,20 +254,20 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 	}
 
 	needsTracking := sliceCanContainCycles(v.Type().Elem().Kind())
+	addr := uintptr(0)
 
 	if needsTracking {
-		addr := v.Pointer()
-		if cloned, exists := c.visited[addr]; exists {
-			if cloned.Len() == v.Len() && cloned.Cap() == v.Cap() {
-				return cloned
-			}
+		addr = v.Pointer()
+		cloned, exists := c.visited[addr]
+		if exists && cloned.Len() == v.Len() && cloned.Cap() == v.Cap() {
+			return cloned
 		}
 	}
 
 	clonedSlice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 
 	if needsTracking {
-		c.visited[v.Pointer()] = clonedSlice
+		c.visited[addr] = clonedSlice
 	}
 
 	for i := range v.Len() {
