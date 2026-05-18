@@ -527,6 +527,15 @@ func TestCloneableInterface(t *testing.T) {
 			t.Errorf("Cloneable result mismatch (-want +got):\n%s", diff)
 		}
 	})
+
+	t.Run("nil pointer", func(t *testing.T) {
+		t.Parallel()
+		var original *nilCloneable
+
+		cloned := Clone(original)
+
+		assert.Nil(t, cloned)
+	})
 }
 
 // CustomType implements Cloneable interface
@@ -536,6 +545,12 @@ type CustomType struct {
 
 func (c CustomType) Clone() any {
 	return CustomType{Value: c.Value + "_cloned"}
+}
+
+type nilCloneable struct{}
+
+func (*nilCloneable) Clone() any {
+	panic("nil cloneable should not be cloned")
 }
 
 // TestCloneCircularReference tests circular reference detection

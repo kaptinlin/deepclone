@@ -176,14 +176,14 @@ func Clone[T any](src T) T {
 		return src
 	}
 
+	if v.Kind() == reflect.Pointer && v.IsNil() {
+		return src
+	}
+
 	if cloneable, ok := any(src).(Cloneable); ok {
 		if result, ok := cloneable.Clone().(T); ok {
 			return result
 		}
-	}
-
-	if v.Kind() == reflect.Pointer && v.IsNil() {
-		return src
 	}
 
 	ctx := newCloneContext()
