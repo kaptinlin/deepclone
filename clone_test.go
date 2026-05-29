@@ -1413,10 +1413,24 @@ func TestCloneNilInterface(t *testing.T) {
 		Value any
 	}
 
-	original := WithInterface{Value: nil}
-	cloned := Clone(original)
+	t.Run("nil interface value", func(t *testing.T) {
+		t.Parallel()
+		original := WithInterface{Value: nil}
+		cloned := Clone(original)
 
-	assert.Nil(t, cloned.Value)
+		assert.Nil(t, cloned.Value)
+	})
+
+	t.Run("typed nil pointer value", func(t *testing.T) {
+		t.Parallel()
+		var value *int
+		original := WithInterface{Value: value}
+		cloned := Clone(original)
+
+		clonedValue, ok := cloned.Value.(*int)
+		require.True(t, ok)
+		assert.Nil(t, clonedValue)
+	})
 }
 
 // TestCloneCloneableReturnsWrongType covers the path where a Cloneable
