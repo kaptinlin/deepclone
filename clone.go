@@ -15,17 +15,31 @@ const (
 
 var (
 	// structCache is bounded by the number of distinct struct types seen.
-	structCache = make(map[reflect.Type]*structTypeInfo)
-	cacheMutex  sync.RWMutex
+	structCache   = make(map[reflect.Type]*structTypeInfo)
+	cacheMutex    sync.RWMutex
+	cloneableType = reflect.TypeFor[Cloneable]()
 )
 
+type visitKind uint8
+
+const (
+	visitPointer visitKind = iota
+	visitSlice
+	visitMap
+)
+
+type visitKey struct {
+	kind visitKind
+	addr uintptr
+}
+
 type cloneContext struct {
-	visited map[uintptr]reflect.Value
+	visited map[visitKey]reflect.Value
 }
 
 func newCloneContext() *cloneContext {
 	return &cloneContext{
-		visited: make(map[uintptr]reflect.Value, 8),
+		visited: make(map[visitKey]reflect.Value, 8),
 	}
 }
 
@@ -51,7 +65,7 @@ func structInfo(t reflect.Type) *structTypeInfo {
 	actions := make([]fieldAction, t.NumField())
 
 	for field := range t.Fields() {
-		if field.IsExported() && shouldCloneKind(field.Type.Kind()) {
+		if field.IsExported() && shouldCloneType(field.Type) {
 			actions[field.Index[0]] = cloneField
 		}
 	}
@@ -92,7 +106,12 @@ func cloneSliceExact[S ~[]E, E any](s S) S {
 
 func shouldCloneKind(kind reflect.Kind) bool {
 	return kind == reflect.Slice || kind == reflect.Map || kind == reflect.Pointer ||
-		kind == reflect.Interface || kind == reflect.Array || kind == reflect.Struct
+		kind == reflect.Interface || kind == reflect.Array || kind == reflect.Struct ||
+		kind == reflect.Chan
+}
+
+func shouldCloneType(t reflect.Type) bool {
+	return shouldCloneKind(t.Kind()) || t.Implements(cloneableType)
 }
 
 func sliceCanContainCycles(kind reflect.Kind) bool {
@@ -107,6 +126,26 @@ func assignableClone(value reflect.Value, target reflect.Type) (reflect.Value, b
 	}
 	if valueType.ConvertibleTo(target) {
 		return value.Convert(target), true
+	}
+	return reflect.Value{}, false
+}
+
+func cloneableValue(v reflect.Value) (reflect.Value, bool) {
+	if v.Kind() == reflect.Interface || !v.CanInterface() {
+		return reflect.Value{}, false
+	}
+
+	cloneable, ok := v.Interface().(Cloneable)
+	if !ok {
+		return reflect.Value{}, false
+	}
+
+	result := reflect.ValueOf(cloneable.Clone())
+	if !result.IsValid() {
+		return reflect.Value{}, false
+	}
+	if cloned, ok := assignableClone(result, v.Type()); ok {
+		return cloned, true
 	}
 	return reflect.Value{}, false
 }
@@ -199,6 +238,12 @@ func (c *cloneContext) cloneValue(v reflect.Value) reflect.Value {
 	if !v.IsValid() {
 		return reflect.Value{}
 	}
+	if v.Kind() == reflect.Pointer && v.IsNil() {
+		return v
+	}
+	if cloned, ok := cloneableValue(v); ok {
+		return cloned
+	}
 
 	switch v.Kind() {
 	case reflect.Pointer:
@@ -230,15 +275,15 @@ func (c *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	addr := v.Pointer()
-	if cloned, exists := c.visited[addr]; exists {
+	key := visitKey{kind: visitPointer, addr: v.Pointer()}
+	if cloned, exists := c.visited[key]; exists {
 		return cloned
 	}
 
 	clonedPtr := reflect.New(v.Type().Elem())
 
 	// Register before recursing to handle self-referencing structures.
-	c.visited[addr] = clonedPtr
+	c.visited[key] = clonedPtr
 
 	elem := c.cloneValue(v.Elem())
 	if elem.IsValid() {
@@ -258,7 +303,8 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 
 	if needsTracking {
 		addr = v.Pointer()
-		cloned, exists := c.visited[addr]
+		key := visitKey{kind: visitSlice, addr: addr}
+		cloned, exists := c.visited[key]
 		if exists && cloned.Len() == v.Len() && cloned.Cap() == v.Cap() {
 			return cloned
 		}
@@ -267,7 +313,7 @@ func (c *cloneContext) cloneSlice(v reflect.Value) reflect.Value {
 	clonedSlice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 
 	if needsTracking {
-		c.visited[addr] = clonedSlice
+		c.visited[visitKey{kind: visitSlice, addr: addr}] = clonedSlice
 	}
 
 	for i := range v.Len() {
@@ -285,13 +331,13 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	addr := v.Pointer()
-	if cloned, exists := c.visited[addr]; exists {
+	key := visitKey{kind: visitMap, addr: v.Pointer()}
+	if cloned, exists := c.visited[key]; exists {
 		return cloned
 	}
 
 	clonedMap := reflect.MakeMapWithSize(v.Type(), v.Len())
-	c.visited[addr] = clonedMap
+	c.visited[key] = clonedMap
 
 	elemType := v.Type().Elem()
 	iter := v.MapRange()

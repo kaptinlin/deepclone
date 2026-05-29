@@ -1385,6 +1385,20 @@ func TestCloneChannelViaReflection(t *testing.T) {
 	assert.Nil(t, cloned.Value)
 }
 
+func TestCloneStructChannelFieldZeroed(t *testing.T) {
+	t.Parallel()
+	type WithChannel struct {
+		Name string
+		Ch   chan int
+	}
+
+	original := WithChannel{Name: "events", Ch: make(chan int, 1)}
+	cloned := Clone(original)
+
+	assert.Equal(t, "events", cloned.Name)
+	assert.Nil(t, cloned.Ch)
+}
+
 // TestCloneFuncViaReflection covers the function as-is return path
 // in cloneValue when a func is inside a struct.
 func TestCloneFuncViaReflection(t *testing.T) {
@@ -1433,6 +1447,37 @@ func TestCloneNilInterface(t *testing.T) {
 	})
 }
 
+type nestedCloneable struct {
+	Value string
+}
+
+func (n nestedCloneable) Clone() any {
+	return nestedCloneable{Value: n.Value + " cloned"}
+}
+
+func TestCloneNestedCloneableValues(t *testing.T) {
+	t.Parallel()
+	type Holder struct {
+		Field nestedCloneable
+		Iface any
+		Map   map[string]any
+		Slice []any
+	}
+
+	original := Holder{
+		Field: nestedCloneable{Value: "field"},
+		Iface: nestedCloneable{Value: "iface"},
+		Map:   map[string]any{"item": nestedCloneable{Value: "map"}},
+		Slice: []any{nestedCloneable{Value: "slice"}},
+	}
+	cloned := Clone(original)
+
+	assert.Equal(t, "field cloned", cloned.Field.Value)
+	assert.Equal(t, "iface cloned", cloned.Iface.(nestedCloneable).Value)
+	assert.Equal(t, "map cloned", cloned.Map["item"].(nestedCloneable).Value)
+	assert.Equal(t, "slice cloned", cloned.Slice[0].(nestedCloneable).Value)
+}
+
 // TestCloneCloneableReturnsWrongType covers the path where a Cloneable
 // implementation returns a type that doesn't match T, falling through
 // to reflection-based cloning.
@@ -1479,6 +1524,52 @@ func TestCloneSliceSubSliceAliasing(t *testing.T) {
 	assert.Len(t, cloned.Sub, 2)
 	assert.Equal(t, 5, cap(cloned.Full))
 	assert.Equal(t, 5, cap(cloned.Sub))
+}
+
+func TestClonePointerToSliceElementDoesNotCollideWithSlice(t *testing.T) {
+	t.Parallel()
+	type node struct {
+		Value int
+	}
+
+	t.Run("pointer before slice", func(t *testing.T) {
+		t.Parallel()
+		type Holder struct {
+			First *node
+			Items []node
+		}
+
+		items := []node{{Value: 1}, {Value: 2}}
+		original := Holder{First: &items[0], Items: items}
+
+		var cloned Holder
+		require.NotPanics(t, func() {
+			cloned = Clone(original)
+		})
+		require.NotNil(t, cloned.First)
+		assert.Equal(t, 1, cloned.First.Value)
+		if diff := cmp.Diff(items, cloned.Items); diff != "" {
+			t.Errorf("slice field mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("slice before pointer", func(t *testing.T) {
+		t.Parallel()
+		type Holder struct {
+			Items []node
+			First *node
+		}
+
+		items := []node{{Value: 1}, {Value: 2}}
+		original := Holder{Items: items, First: &items[0]}
+		cloned := Clone(original)
+
+		require.NotNil(t, cloned.First)
+		assert.Equal(t, 1, cloned.First.Value)
+		if diff := cmp.Diff(items, cloned.Items); diff != "" {
+			t.Errorf("slice field mismatch (-want +got):\n%s", diff)
+		}
+	})
 }
 
 type panicCloneable struct{}
