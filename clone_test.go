@@ -536,6 +536,17 @@ func TestCloneableInterface(t *testing.T) {
 
 		assert.Nil(t, cloned)
 	})
+
+	t.Run("convertible clone result", func(t *testing.T) {
+		t.Parallel()
+		calls := 0
+		original := convertibleCloneable{Value: "test", calls: &calls}
+
+		cloned := Clone(original)
+
+		assert.Equal(t, "test_cloned", cloned.Value)
+		assert.Equal(t, 1, calls)
+	})
 }
 
 // CustomType implements Cloneable interface
@@ -545,6 +556,21 @@ type CustomType struct {
 
 func (c CustomType) Clone() any {
 	return CustomType{Value: c.Value + "_cloned"}
+}
+
+type convertibleCloneable struct {
+	Value string
+	calls *int
+}
+
+type convertibleCloneResult struct {
+	Value string
+	calls *int
+}
+
+func (c convertibleCloneable) Clone() any {
+	(*c.calls)++
+	return convertibleCloneResult{Value: c.Value + "_cloned", calls: c.calls}
 }
 
 type nilCloneable struct{}

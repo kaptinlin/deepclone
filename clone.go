@@ -220,8 +220,11 @@ func Clone[T any](src T) T {
 	}
 
 	if cloneable, ok := any(src).(Cloneable); ok {
-		if result, ok := cloneable.Clone().(T); ok {
-			return result
+		result := reflect.ValueOf(cloneable.Clone())
+		if result.IsValid() {
+			if cloned, ok := assignableClone(result, reflect.TypeFor[T]()); ok {
+				return cloned.Interface().(T)
+			}
 		}
 	}
 
