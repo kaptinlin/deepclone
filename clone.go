@@ -116,7 +116,7 @@ func shouldCloneType(t reflect.Type) bool {
 
 func sliceCanContainCycles(kind reflect.Kind) bool {
 	return kind == reflect.Pointer || kind == reflect.Interface || kind == reflect.Slice ||
-		kind == reflect.Map || kind == reflect.Struct
+		kind == reflect.Map || kind == reflect.Struct || kind == reflect.Array
 }
 
 func assignableClone(value reflect.Value, target reflect.Type) (reflect.Value, bool) {
@@ -175,6 +175,8 @@ func Clone[T any](src T) T {
 	case []int64:
 		return any(cloneSliceExact(s)).(T)
 	case []uint:
+		return any(cloneSliceExact(s)).(T)
+	case []byte:
 		return any(cloneSliceExact(s)).(T)
 	case []uint16:
 		return any(cloneSliceExact(s)).(T)

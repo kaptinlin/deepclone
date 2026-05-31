@@ -1280,6 +1280,22 @@ func TestCloneCircularSliceReference(t *testing.T) {
 	assert.Equal(t, "value", inner[0])
 }
 
+func TestCloneCircularSliceThroughArrayElement(t *testing.T) {
+	t.Parallel()
+
+	original := make([][1]any, 1)
+	original[0][0] = original
+
+	cloned := Clone(original)
+
+	require.Len(t, cloned, 1)
+	inner, ok := cloned[0][0].([][1]any)
+	require.True(t, ok)
+	require.Len(t, inner, 1)
+	assert.Same(t, &cloned[0], &inner[0], "array element should reference the cloned slice")
+	assert.NotSame(t, &original[0], &inner[0], "array element should not reference the original slice")
+}
+
 // TestCloneSharedMapReference covers the case where the same map
 // is referenced from two struct fields, hitting the visited cache
 // in cloneMap on the second encounter.
