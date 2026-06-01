@@ -408,7 +408,21 @@ func (c *cloneContext) cloneInterface(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	clonedElem := c.cloneValue(v.Elem())
+	elem := v.Elem()
+	if (elem.Kind() != reflect.Pointer || !elem.IsNil()) && v.CanInterface() {
+		if cloneable, ok := v.Interface().(Cloneable); ok {
+			result := reflect.ValueOf(cloneable.Clone())
+			if result.IsValid() {
+				if cloned, ok := assignableClone(result, v.Type()); ok {
+					iface := reflect.New(v.Type()).Elem()
+					iface.Set(cloned)
+					return iface
+				}
+			}
+		}
+	}
+
+	clonedElem := c.cloneValue(elem)
 	if !clonedElem.IsValid() {
 		return v
 	}

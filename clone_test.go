@@ -1497,6 +1497,18 @@ func (n nestedCloneable) Clone() any {
 	return nestedCloneable{Value: n.Value + " cloned"}
 }
 
+type replacementCloneable struct {
+	Value string
+}
+
+type replacementCloneResult struct {
+	Value string
+}
+
+func (r replacementCloneable) Clone() any {
+	return replacementCloneResult{Value: r.Value + " cloned"}
+}
+
 func TestCloneNestedCloneableValues(t *testing.T) {
 	t.Parallel()
 	type Holder struct {
@@ -1518,6 +1530,37 @@ func TestCloneNestedCloneableValues(t *testing.T) {
 	assert.Equal(t, "iface cloned", cloned.Iface.(nestedCloneable).Value)
 	assert.Equal(t, "map cloned", cloned.Map["item"].(nestedCloneable).Value)
 	assert.Equal(t, "slice cloned", cloned.Slice[0].(nestedCloneable).Value)
+}
+
+func TestCloneInterfaceUsesAssignableCloneableResult(t *testing.T) {
+	t.Parallel()
+	t.Run("non-nil cloneable", func(t *testing.T) {
+		t.Parallel()
+		original := map[string]any{
+			"item": replacementCloneable{Value: "interface"},
+		}
+
+		cloned := Clone(original)
+
+		result, ok := cloned["item"].(replacementCloneResult)
+		require.True(t, ok)
+		assert.Equal(t, "interface cloned", result.Value)
+	})
+
+	t.Run("typed nil cloneable pointer", func(t *testing.T) {
+		t.Parallel()
+		var item *nilCloneable
+		original := map[string]any{"item": item}
+
+		var cloned map[string]any
+		require.NotPanics(t, func() {
+			cloned = Clone(original)
+		})
+
+		clonedItem, ok := cloned["item"].(*nilCloneable)
+		require.True(t, ok)
+		assert.Nil(t, clonedItem)
+	})
 }
 
 // TestCloneCloneableReturnsWrongType covers the path where a Cloneable
