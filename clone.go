@@ -31,6 +31,7 @@ const (
 type visitKey struct {
 	kind visitKind
 	addr uintptr
+	typ  reflect.Type
 }
 
 type cloneContext struct {
@@ -280,7 +281,7 @@ func (c *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 		return v
 	}
 
-	key := visitKey{kind: visitPointer, addr: v.Pointer()}
+	key := visitKey{kind: visitPointer, addr: v.Pointer(), typ: v.Type()}
 	if cloned, exists := c.visited[key]; exists {
 		return cloned
 	}
@@ -290,7 +291,13 @@ func (c *cloneContext) clonePointer(v reflect.Value) reflect.Value {
 	// Register before recursing to handle self-referencing structures.
 	c.visited[key] = clonedPtr
 
-	elem := c.cloneValue(v.Elem())
+	elemValue := v.Elem()
+	if elemValue.Kind() == reflect.Struct {
+		c.cloneStructInto(elemValue, clonedPtr.Elem())
+		return clonedPtr
+	}
+
+	elem := c.cloneValue(elemValue)
 	if elem.IsValid() {
 		clonedPtr.Elem().Set(elem)
 	}
@@ -366,7 +373,61 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 
 func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 	clonedStruct := reflect.New(v.Type()).Elem()
+	c.cloneStructInto(v, clonedStruct)
+	return clonedStruct
+}
+
+func (c *cloneContext) registerAddress(src, dst reflect.Value) {
+	if src.CanAddr() && dst.CanAddr() {
+		addr := src.Addr()
+		c.visited[visitKey{kind: visitPointer, addr: addr.Pointer(), typ: addr.Type()}] = dst.Addr()
+	}
+}
+
+func (c *cloneContext) registerArrayElements(v, clonedArray reflect.Value) {
+	for i := range v.Len() {
+		src := v.Index(i)
+		dst := clonedArray.Index(i)
+		c.registerAddress(src, dst)
+
+		switch src.Kind() {
+		case reflect.Struct:
+			if !src.Type().Implements(cloneableType) {
+				c.registerStructFields(src, dst)
+			}
+		case reflect.Array:
+			c.registerArrayElements(src, dst)
+		default:
+		}
+	}
+}
+
+func (c *cloneContext) registerStructFields(v, clonedStruct reflect.Value) {
+	for i := range v.NumField() {
+		fieldInfo := v.Type().Field(i)
+		if !fieldInfo.IsExported() {
+			continue
+		}
+
+		src := v.Field(i)
+		dst := clonedStruct.Field(i)
+		c.registerAddress(src, dst)
+
+		switch src.Kind() {
+		case reflect.Struct:
+			if !src.Type().Implements(cloneableType) {
+				c.registerStructFields(src, dst)
+			}
+		case reflect.Array:
+			c.registerArrayElements(src, dst)
+		default:
+		}
+	}
+}
+
+func (c *cloneContext) cloneStructInto(v, clonedStruct reflect.Value) {
 	info := structInfo(v.Type())
+	c.registerStructFields(v, clonedStruct)
 
 	for i, action := range info.actions {
 		src := v.Field(i)
@@ -378,6 +439,11 @@ func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 				dst.Set(src)
 			}
 		case cloneField:
+			if src.Kind() == reflect.Struct && dst.CanSet() && !src.Type().Implements(cloneableType) {
+				c.cloneStructInto(src, dst)
+				continue
+			}
+
 			clonedField := c.cloneValue(src)
 			if clonedField.IsValid() && dst.CanSet() {
 				if clonedField, ok := assignableClone(clonedField, dst.Type()); ok {
@@ -386,12 +452,11 @@ func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
 			}
 		}
 	}
-
-	return clonedStruct
 }
 
 func (c *cloneContext) cloneArray(v reflect.Value) reflect.Value {
 	clonedArray := reflect.New(v.Type()).Elem()
+	c.registerArrayElements(v, clonedArray)
 
 	for i := range v.Len() {
 		elem := c.cloneValue(v.Index(i))
