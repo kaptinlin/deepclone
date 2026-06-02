@@ -351,17 +351,35 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	clonedMap := reflect.MakeMapWithSize(v.Type(), v.Len())
 	c.visited[key] = clonedMap
 
+	keyType := v.Type().Key()
 	elemType := v.Type().Elem()
 	iter := v.MapRange()
 	for iter.Next() {
-		key := c.cloneValue(iter.Key())
-		value := c.cloneValue(iter.Value())
+		srcKey := iter.Key()
+		srcValue := iter.Value()
+		pointerKey, keyIsPointer := pointerVisitKey(srcKey)
+
+		var key reflect.Value
+		var value reflect.Value
+		if keyIsPointer {
+			key = c.cloneValue(srcKey)
+			value = c.cloneValue(srcValue)
+			key = c.refreshPointerKey(pointerKey, key)
+		} else {
+			value = c.cloneValue(srcValue)
+			key = c.cloneValue(srcKey)
+		}
 
 		if !key.IsValid() || !value.IsValid() {
 			continue
 		}
 
-		value, ok := assignableClone(value, elemType)
+		key, ok := assignableClone(key, keyType)
+		if !ok {
+			continue
+		}
+
+		value, ok = assignableClone(value, elemType)
 		if !ok {
 			continue
 		}
@@ -369,6 +387,27 @@ func (c *cloneContext) cloneMap(v reflect.Value) reflect.Value {
 	}
 
 	return clonedMap
+}
+
+func (c *cloneContext) refreshPointerKey(key visitKey, clonedKey reflect.Value) reflect.Value {
+	if current, exists := c.visited[key]; exists {
+		return current
+	}
+	return clonedKey
+}
+
+func pointerVisitKey(v reflect.Value) (visitKey, bool) {
+	for v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return visitKey{}, false
+		}
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Pointer || v.IsNil() {
+		return visitKey{}, false
+	}
+	return visitKey{kind: visitPointer, addr: v.Pointer(), typ: v.Type()}, true
 }
 
 func (c *cloneContext) cloneStruct(v reflect.Value) reflect.Value {
