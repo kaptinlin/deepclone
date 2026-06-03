@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMainPrintsCustomCloneableExample(t *testing.T) {
+func TestMainPrintsCustomClonerExample(t *testing.T) {
 	// main redirects process stdout, so this test cannot run in parallel.
 	output := captureOutput(t, main)
 
-	assert.Contains(t, output, "=== Custom Cloneable Interface Example ===")
+	assert.Contains(t, output, "=== Custom Cloner Interface Example ===")
 	assert.Contains(t, output, "Original: Value=10, Name=main")
 	assert.Contains(t, output, "Cloned:   Value=11, Name=main_copy")
 	assert.Contains(t, output, "Original: Name=Alice Modified, Age=30")

@@ -86,41 +86,41 @@ var (
 func BenchmarkClone(b *testing.B) {
 	b.Run("int", func(b *testing.B) {
 		for b.Loop() {
-			_ = Clone(benchIntVal)
+			_, _ = Clone(benchIntVal)
 		}
 	})
 
 	b.Run("string", func(b *testing.B) {
 		for b.Loop() {
-			_ = Clone(benchStringVal)
+			_, _ = Clone(benchStringVal)
 		}
 	})
 
 	b.Run("slice_100", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(benchSliceVal)
+			_, _ = Clone(benchSliceVal)
 		}
 	})
 
 	b.Run("map_100", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(benchMapVal)
+			_, _ = Clone(benchMapVal)
 		}
 	})
 
 	b.Run("simple_struct", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(benchSimpleVal)
+			_, _ = Clone(benchSimpleVal)
 		}
 	})
 
 	b.Run("nested_struct", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(benchNestedVal)
+			_, _ = Clone(benchNestedVal)
 		}
 	})
 
@@ -128,21 +128,21 @@ func BenchmarkClone(b *testing.B) {
 		ptr := &benchSimpleVal
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(ptr)
+			_, _ = Clone(ptr)
 		}
 	})
 
 	b.Run("circular", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(benchCircularVal)
+			_, _ = Clone(benchCircularVal)
 		}
 	})
 
 	b.Run("large_slice_10k", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(benchLargeSliceVal)
+			_, _ = Clone(benchLargeSliceVal)
 		}
 	})
 
@@ -150,7 +150,7 @@ func BenchmarkClone(b *testing.B) {
 		var iface any = benchSimpleVal
 		b.ReportAllocs()
 		for b.Loop() {
-			_ = Clone(iface)
+			_, _ = Clone(iface)
 		}
 	})
 }

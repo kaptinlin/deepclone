@@ -1,19 +1,22 @@
 # DeepClone
 
-A high-performance deep cloning library for Go that safely copies arbitrary values with one generic API
+A high-performance deep cloning library for Go values whose state can be represented as memory-owned data.
 
 [![Go Module](https://img.shields.io/badge/go-1.26.3%2B-blue)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/deepclone)](https://goreportcard.com/report/github.com/kaptinlin/deepclone)
 
+DeepClone is intentionally honest: it clones supported in-memory values, preserves supported object relationships, and returns an error for runtime or resource state that cannot be meaningfully deep-cloned.
+
 ## Features
 
-- **Generic API**: Clone any Go value with `deepclone.Clone(value)`
-- **Fast common paths**: Copy primitives, common slices, and common maps without reflection overhead
-- **Circular reference safety**: Preserve object graphs when cloning through the reflection path
-- **Custom cloning**: Implement `Cloneable` for domain-specific copy behavior
-- **Concurrent use**: Share the package safely across goroutines
-- **No runtime dependencies**: Core library uses only the Go standard library
+- **Generic API**: Clone Go values with `deepclone.Clone(value)`.
+- **Honest errors**: Unsupported state returns `UnsupportedError` with path, type, and reason.
+- **Fast common paths**: Primitives, scalar slices, and scalar maps avoid reflection overhead.
+- **Graph safety**: Pointer cycles, map cycles, slice cycles, and shared pointer targets are preserved.
+- **Custom cloning**: Implement `Cloner[T]` for private invariants or domain-specific behavior.
+- **Concurrent use**: Package state is safe under concurrent cloning.
+- **No runtime dependencies**: Core library uses only the Go standard library.
 
 ## Installation
 
@@ -29,22 +32,26 @@ Requires Go 1.26.3 or later.
 package main
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/kaptinlin/deepclone"
+	"github.com/kaptinlin/deepclone"
 )
 
 func main() {
-    original := map[string][]int{
-        "numbers": {1, 2, 3},
-        "scores":  {85, 90, 95},
-    }
+	original := map[string][]int{
+		"numbers": {1, 2, 3},
+		"scores":  {85, 90, 95},
+	}
 
-    cloned := deepclone.Clone(original)
-    original["numbers"][0] = 999
+	cloned, err := deepclone.Clone(original)
+	if err != nil {
+		panic(err)
+	}
 
-    fmt.Println(original["numbers"])
-    fmt.Println(cloned["numbers"])
+	original["numbers"][0] = 999
+
+	fmt.Println(original["numbers"])
+	fmt.Println(cloned["numbers"])
 }
 ```
 
@@ -55,14 +62,24 @@ Output:
 [1 2 3]
 ```
 
-## API Overview
+## API
 
-| API | Purpose |
-| --- | --- |
-| `Clone[T any](src T) T` | Return a deep copy of `src` |
-| `Cloneable` | Let a type provide its own clone implementation |
-| `CacheStats() (entries, fields int)` | Inspect cached struct metadata |
-| `ResetCache()` | Clear cached struct metadata, usually in tests and benchmarks |
+```go
+func Clone[T any](src T) (T, error)
+func MustClone[T any](src T) T
+
+type Cloner[T any] interface {
+	Clone() (T, error)
+}
+
+type UnsupportedError struct {
+	Path   string
+	Type   reflect.Type
+	Reason string
+}
+```
+
+Use `Clone` in production paths where unsupported state should be handled. Use `MustClone` for tests, fixtures, and values that are already known to be supported.
 
 ## Usage
 
@@ -70,55 +87,111 @@ Output:
 
 ```go
 type User struct {
-    Name    string
-    Friends []string
-    Config  map[string]any
+	Name    string
+	Friends []string
+	Config  map[string]any
 }
 
 user := User{
-    Name:    "Alice",
-    Friends: []string{"Bob", "Charlie"},
-    Config:  map[string]any{"theme": "dark"},
+	Name:    "Alice",
+	Friends: []string{"Bob", "Charlie"},
+	Config:  map[string]any{"theme": "dark"},
 }
 
-cloned := deepclone.Clone(user)
+cloned, err := deepclone.Clone(user)
+if err != nil {
+	return err
+}
+
 cloned.Friends[0] = "Eve"
 ```
 
-`user.Friends` remains unchanged because slices, maps, arrays, structs, pointers, and interfaces are cloned recursively.
+`user.Friends` remains unchanged because supported slices, maps, arrays, structs, pointers, and interfaces are cloned recursively.
+
+### Handle unsupported state
+
+```go
+type Worker struct {
+	Ch chan int
+}
+
+_, err := deepclone.Clone(map[string]Worker{
+	"main": {Ch: make(chan int)},
+})
+if err != nil {
+	var unsupported *deepclone.UnsupportedError
+	if errors.As(err, &unsupported) {
+		fmt.Println(unsupported.Path)   // $["main"].Ch
+		fmt.Println(unsupported.Reason) // channels cannot be cloned
+	}
+}
+```
+
+Unsupported errors are stable and intentionally do not include value contents.
 
 ### Customize clone behavior
 
 ```go
 type Document struct {
-    Title   string
-    Content []byte
-    Version int
+	Title   string
+	Content []byte
+	Version int
 }
 
-func (d Document) Clone() any {
-    return Document{
-        Title:   d.Title,
-        Content: deepclone.Clone(d.Content),
-        Version: d.Version + 1,
-    }
+func (d Document) Clone() (Document, error) {
+	content, err := deepclone.Clone(d.Content)
+	if err != nil {
+		return Document{}, err
+	}
+	return Document{
+		Title:   d.Title,
+		Content: content,
+		Version: d.Version + 1,
+	}, nil
 }
 ```
 
-Types that implement `Cloneable` control their own cloning behavior. Circular reference detection does not apply inside custom `Clone` methods.
+Types that implement `Cloner[T]` control their own cloning behavior. Circular reference detection does not apply inside custom `Clone` methods.
 
-### Special cases
+## Semantics
+
+DeepClone preserves supported object relationships:
+
+- pointer cycles
+- map cycles
+- slice cycles
+- shared pointer targets
+- pointer-to-struct-field relationships when the owner is cloned in the same graph
+- pointer-to-array-element relationships when the owner is cloned in the same graph
+
+DeepClone does not promise full backing-array alias reconstruction for distinct subslices, and it does not promise map entry interior pointer reconstruction.
+
+## Special Cases
 
 | Value kind | Clone behavior |
 | --- | --- |
-| Nil pointers, slices, and maps | Preserved as nil |
-| Functions | Returned as-is |
-| Channels | Returned as the zero value of the same channel type |
-| Unexported struct fields | Left at the zero value |
+| Nil pointers, slices, maps, interfaces, channels, functions, unsafe pointers | Preserved as nil |
+| Non-nil channels | Return `UnsupportedError` |
+| Non-nil functions | Return `UnsupportedError` |
+| Non-nil unsafe pointers | Return `UnsupportedError` |
+| Sync primitives and atomic state | Return `UnsupportedError` |
+| File handles | Return `UnsupportedError` |
+| Unexported value-like struct fields | Preserved by shallow struct copy |
+| Unexported reference-like struct fields | Return `UnsupportedError`; implement `Cloner[T]` for private invariants |
 
 ## Performance
 
-DeepClone keeps common operations fast with primitive, slice, and map fast paths plus cached reflection metadata for structs.
+DeepClone keeps common operations fast with primitive, scalar slice, and scalar map fast paths plus cached reflection metadata for structs.
+
+Recent sanity benchmark on darwin/arm64:
+
+| Operation | Performance | Memory | Allocations |
+| --- | ---: | ---: | ---: |
+| int | 1.7 ns/op | 0 B/op | 0 allocs/op |
+| string | 1.9 ns/op | 0 B/op | 0 allocs/op |
+| slice 100 | 160 ns/op | 896 B/op | 1 alloc/op |
+| map 100 | 390 ns/op | 3,544 B/op | 4 allocs/op |
+| large slice 10K | 4,988 ns/op | 81,921 B/op | 1 alloc/op |
 
 ```bash
 task bench

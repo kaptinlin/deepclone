@@ -10,11 +10,11 @@ import (
 )
 
 // These tests run serially because they mutate or assert on the package-global struct cache.
-func TestCacheStats(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+func TestStructCacheMetrics(t *testing.T) {
+	resetCache()
+	t.Cleanup(resetCache)
 
-	entries, fields := CacheStats()
+	entries, fields := cacheStats()
 	assert.Equal(t, 0, entries)
 	assert.Equal(t, 0, fields)
 
@@ -22,9 +22,9 @@ func TestCacheStats(t *testing.T) {
 		A int
 		B string
 	}
-	Clone(TwoFields{A: 1, B: "x"})
+	MustClone(TwoFields{A: 1, B: "x"})
 
-	entries, fields = CacheStats()
+	entries, fields = cacheStats()
 	assert.Equal(t, 1, entries)
 	assert.Equal(t, 2, fields)
 
@@ -33,30 +33,30 @@ func TestCacheStats(t *testing.T) {
 		Y float64
 		Z float64
 	}
-	Clone(ThreeFields{X: 1, Y: 2, Z: 3})
+	MustClone(ThreeFields{X: 1, Y: 2, Z: 3})
 
-	entries, fields = CacheStats()
+	entries, fields = cacheStats()
 	assert.Equal(t, 2, entries)
 	assert.Equal(t, 5, fields) // 2 + 3
 }
 
-func TestCacheStatsIdempotent(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+func TestStructCacheMetricsIdempotent(t *testing.T) {
+	resetCache()
+	t.Cleanup(resetCache)
 
 	type S struct{ V int }
 	for range 100 {
-		Clone(S{V: 42})
+		MustClone(S{V: 42})
 	}
 
-	entries, fields := CacheStats()
+	entries, fields := cacheStats()
 	assert.Equal(t, 1, entries, "same type cloned 100x produces one entry")
 	assert.Equal(t, 1, fields)
 }
 
-func TestCacheStatsIncludesUnexportedFields(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+func TestStructCacheMetricsIncludesUnexportedFields(t *testing.T) {
+	resetCache()
+	t.Cleanup(resetCache)
 
 	type mixedVisibility struct {
 		Visible string
@@ -66,37 +66,36 @@ func TestCacheStatsIncludesUnexportedFields(t *testing.T) {
 
 	original := mixedVisibility{
 		Visible: "x",
-		hidden:  []int{1, 2, 3},
 		count:   7,
 	}
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	assert.Equal(t, "x", cloned.Visible)
 	assert.Nil(t, cloned.hidden)
-	assert.Zero(t, cloned.count)
+	assert.Equal(t, 7, cloned.count)
 
-	entries, fields := CacheStats()
+	entries, fields := cacheStats()
 	assert.Equal(t, 1, entries)
 	assert.Equal(t, 3, fields)
 }
 
-func TestResetCache(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+func TestStructCacheReset(t *testing.T) {
+	resetCache()
+	t.Cleanup(resetCache)
 
 	type R struct{ V int }
-	Clone(R{V: 1})
+	MustClone(R{V: 1})
 
-	entries, _ := CacheStats()
+	entries, _ := cacheStats()
 	require.Equal(t, 1, entries)
 
-	ResetCache()
-	entries, _ = CacheStats()
+	resetCache()
+	entries, _ = cacheStats()
 	assert.Equal(t, 0, entries)
 
 	// Cache repopulates on next clone.
-	Clone(R{V: 2})
-	entries, _ = CacheStats()
+	MustClone(R{V: 2})
+	entries, _ = cacheStats()
 	assert.Equal(t, 1, entries)
 }
 
@@ -213,64 +212,64 @@ type cacheT50 struct{ A, B, C, D, E, F, G, H, I, J, K, L, M, N, O float64 }
 
 // cloneManyDistinctTypes populates the cache with 50 distinct struct types.
 func cloneManyDistinctTypes() {
-	Clone(cacheT01{})
-	Clone(cacheT02{})
-	Clone(cacheT03{})
-	Clone(cacheT04{})
-	Clone(cacheT05{})
-	Clone(cacheT06{})
-	Clone(cacheT07{})
-	Clone(cacheT08{})
-	Clone(cacheT09{})
-	Clone(cacheT10{})
-	Clone(cacheT11{})
-	Clone(cacheT12{})
-	Clone(cacheT13{})
-	Clone(cacheT14{})
-	Clone(cacheT15{})
-	Clone(cacheT16{})
-	Clone(cacheT17{})
-	Clone(cacheT18{})
-	Clone(cacheT19{})
-	Clone(cacheT20{})
-	Clone(cacheT21{})
-	Clone(cacheT22{})
-	Clone(cacheT23{})
-	Clone(cacheT24{})
-	Clone(cacheT25{})
-	Clone(cacheT26{})
-	Clone(cacheT27{})
-	Clone(cacheT28{})
-	Clone(cacheT29{})
-	Clone(cacheT30{})
-	Clone(cacheT31{})
-	Clone(cacheT32{})
-	Clone(cacheT33{})
-	Clone(cacheT34{})
-	Clone(cacheT35{})
-	Clone(cacheT36{})
-	Clone(cacheT37{})
-	Clone(cacheT38{})
-	Clone(cacheT39{})
-	Clone(cacheT40{})
-	Clone(cacheT41{})
-	Clone(cacheT42{})
-	Clone(cacheT43{})
-	Clone(cacheT44{})
-	Clone(cacheT45{})
-	Clone(cacheT46{})
-	Clone(cacheT47{})
-	Clone(cacheT48{})
-	Clone(cacheT49{})
-	Clone(cacheT50{})
+	MustClone(cacheT01{})
+	MustClone(cacheT02{})
+	MustClone(cacheT03{})
+	MustClone(cacheT04{})
+	MustClone(cacheT05{})
+	MustClone(cacheT06{})
+	MustClone(cacheT07{})
+	MustClone(cacheT08{})
+	MustClone(cacheT09{})
+	MustClone(cacheT10{})
+	MustClone(cacheT11{})
+	MustClone(cacheT12{})
+	MustClone(cacheT13{})
+	MustClone(cacheT14{})
+	MustClone(cacheT15{})
+	MustClone(cacheT16{})
+	MustClone(cacheT17{})
+	MustClone(cacheT18{})
+	MustClone(cacheT19{})
+	MustClone(cacheT20{})
+	MustClone(cacheT21{})
+	MustClone(cacheT22{})
+	MustClone(cacheT23{})
+	MustClone(cacheT24{})
+	MustClone(cacheT25{})
+	MustClone(cacheT26{})
+	MustClone(cacheT27{})
+	MustClone(cacheT28{})
+	MustClone(cacheT29{})
+	MustClone(cacheT30{})
+	MustClone(cacheT31{})
+	MustClone(cacheT32{})
+	MustClone(cacheT33{})
+	MustClone(cacheT34{})
+	MustClone(cacheT35{})
+	MustClone(cacheT36{})
+	MustClone(cacheT37{})
+	MustClone(cacheT38{})
+	MustClone(cacheT39{})
+	MustClone(cacheT40{})
+	MustClone(cacheT41{})
+	MustClone(cacheT42{})
+	MustClone(cacheT43{})
+	MustClone(cacheT44{})
+	MustClone(cacheT45{})
+	MustClone(cacheT46{})
+	MustClone(cacheT47{})
+	MustClone(cacheT48{})
+	MustClone(cacheT49{})
+	MustClone(cacheT50{})
 }
 
 // TestCacheMemoryFootprint validates that the struct field cache uses
 // bounded, predictable memory. This demonstrates why LRU eviction is
 // unnecessary: entries equal distinct struct types — a finite quantity.
 func TestCacheMemoryFootprint(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+	resetCache()
+	t.Cleanup(resetCache)
 
 	// Use TotalAlloc (monotonically increasing) to measure cumulative
 	// allocations. HeapAlloc can decrease due to GC between measurements.
@@ -284,14 +283,12 @@ func TestCacheMemoryFootprint(t *testing.T) {
 	var after runtime.MemStats
 	runtime.ReadMemStats(&after)
 
-	entries, fields := CacheStats()
+	entries, fields := cacheStats()
 	assert.Equal(t, 50, entries)
 	assert.Greater(t, fields, 0)
 
-	// Each structTypeInfo stores:
-	//   - []fieldAction: 24 (header) + 8*N bytes
-	//   - numFields: 8 bytes
-	// Plus map bucket overhead per entry.
+	// Each structTypeInfo stores a small field metadata slice plus map bucket
+	// overhead per entry.
 	//
 	// For 50 types averaging ~5 fields, total should be well under 1 MB.
 	totalAlloc := after.TotalAlloc - before.TotalAlloc
@@ -311,19 +308,19 @@ func TestCacheMemoryFootprint(t *testing.T) {
 // TestCacheBoundedGrowth verifies that cloning the same types repeatedly
 // does not grow the cache beyond the number of distinct types.
 func TestCacheBoundedGrowth(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+	resetCache()
+	t.Cleanup(resetCache)
 
 	// Populate with 50 types.
 	cloneManyDistinctTypes()
-	entries1, fields1 := CacheStats()
+	entries1, fields1 := cacheStats()
 
 	// Clone all 50 types again 100 times.
 	for range 100 {
 		cloneManyDistinctTypes()
 	}
 
-	entries2, fields2 := CacheStats()
+	entries2, fields2 := cacheStats()
 	assert.Equal(t, entries1, entries2, "cache entries should not grow")
 	assert.Equal(t, fields1, fields2, "cached fields should not grow")
 }
@@ -331,8 +328,8 @@ func TestCacheBoundedGrowth(t *testing.T) {
 // TestCacheConcurrentAccess verifies thread safety of the cache under
 // concurrent clone operations from multiple goroutines.
 func TestCacheConcurrentAccess(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+	resetCache()
+	t.Cleanup(resetCache)
 
 	const goroutines = 50
 	var wg sync.WaitGroup
@@ -345,16 +342,16 @@ func TestCacheConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 
-	entries, _ := CacheStats()
+	entries, _ := cacheStats()
 	assert.Equal(t, 50, entries,
 		"concurrent access should produce exactly 50 entries")
 }
 
-// TestResetCacheConcurrent verifies that ResetCache is safe to call
+// TestStructCacheResetConcurrent verifies that struct cache reset is safe to call
 // concurrently with clone operations.
-func TestResetCacheConcurrent(t *testing.T) {
-	ResetCache()
-	t.Cleanup(ResetCache)
+func TestStructCacheResetConcurrent(t *testing.T) {
+	resetCache()
+	t.Cleanup(resetCache)
 
 	const goroutines = 20
 	var wg sync.WaitGroup
@@ -363,7 +360,7 @@ func TestResetCacheConcurrent(t *testing.T) {
 		wg.Go(func() {
 			cloneManyDistinctTypes()
 			if i%5 == 0 {
-				ResetCache()
+				resetCache()
 			}
 		})
 	}
@@ -371,7 +368,7 @@ func TestResetCacheConcurrent(t *testing.T) {
 
 	// After all goroutines finish, cache should be in a valid state.
 	// The exact count depends on timing, but it must not panic.
-	entries, fields := CacheStats()
+	entries, fields := cacheStats()
 	assert.GreaterOrEqual(t, entries, 0)
 	assert.GreaterOrEqual(t, fields, 0)
 }

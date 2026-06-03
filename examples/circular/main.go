@@ -20,7 +20,7 @@ func main() {
 	node1.Next = node2
 	node2.Next = node1
 
-	cloned := deepclone.Clone(node1)
+	cloned := deepclone.MustClone(node1)
 
 	fmt.Printf("Original: %d -> %d -> %d\n",
 		node1.ID, node1.Next.ID, node1.Next.Next.ID)

@@ -10,7 +10,10 @@ func ExampleClone() {
 	original := map[string][]int{
 		"scores": {90, 85, 77},
 	}
-	cloned := deepclone.Clone(original)
+	cloned, err := deepclone.Clone(original)
+	if err != nil {
+		panic(err)
+	}
 
 	// Modify the clone — original is unaffected
 	cloned["scores"][0] = 100
@@ -41,7 +44,7 @@ func ExampleClone_struct() {
 			State: "OR",
 		},
 	}
-	cloned := deepclone.Clone(original)
+	cloned := deepclone.MustClone(original)
 
 	// Modify the clone's nested pointer — original is unaffected
 	cloned.Address.City = "Seattle"
@@ -56,7 +59,7 @@ func ExampleClone_struct() {
 
 func ExampleClone_slice() {
 	original := []string{"a", "b", "c"}
-	cloned := deepclone.Clone(original)
+	cloned := deepclone.MustClone(original)
 
 	cloned[0] = "z"
 
@@ -69,33 +72,37 @@ func ExampleClone_slice() {
 
 func ExampleClone_nil() {
 	var original []int
-	cloned := deepclone.Clone(original)
+	cloned := deepclone.MustClone(original)
 
 	fmt.Println("nil preserved:", cloned == nil)
 	// Output:
 	// nil preserved: true
 }
 
-// Document is a type that implements the Cloneable interface
+// Document is a type that implements the Cloner interface
 // to provide custom deep cloning behavior.
 type Document struct {
 	Title string
 	Tags  []string
 }
 
-func (d Document) Clone() any {
+func (d Document) Clone() (Document, error) {
+	tags, err := deepclone.Clone(d.Tags)
+	if err != nil {
+		return Document{}, err
+	}
 	return Document{
 		Title: d.Title,
-		Tags:  deepclone.Clone(d.Tags),
-	}
+		Tags:  tags,
+	}, nil
 }
 
-func ExampleCloneable() {
+func ExampleCloner() {
 	original := Document{
 		Title: "Guide",
 		Tags:  []string{"go", "clone"},
 	}
-	cloned := deepclone.Clone(original)
+	cloned := deepclone.MustClone(original)
 
 	cloned.Tags[0] = "rust"
 
@@ -104,30 +111,4 @@ func ExampleCloneable() {
 	// Output:
 	// original: [go clone]
 	// cloned:   [rust clone]
-}
-
-func ExampleCacheStats() {
-	deepclone.ResetCache()
-
-	type Point struct{ X, Y int }
-	_ = deepclone.Clone(Point{1, 2})
-
-	entries, fields := deepclone.CacheStats()
-	fmt.Println("entries:", entries)
-	fmt.Println("fields:", fields)
-	// Output:
-	// entries: 1
-	// fields: 2
-}
-
-func ExampleResetCache() {
-	type Coord struct{ X, Y int }
-	_ = deepclone.Clone(Coord{1, 2})
-
-	deepclone.ResetCache()
-
-	entries, _ := deepclone.CacheStats()
-	fmt.Println("entries after reset:", entries)
-	// Output:
-	// entries after reset: 0
 }

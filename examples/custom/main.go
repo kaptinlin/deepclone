@@ -12,11 +12,11 @@ type counter struct {
 	Name  string
 }
 
-func (c counter) Clone() any {
+func (c counter) Clone() (counter, error) {
 	return counter{
 		Value: c.Value + 1,
 		Name:  c.Name + "_copy",
-	}
+	}, nil
 }
 
 type person struct {
@@ -25,18 +25,18 @@ type person struct {
 }
 
 func main() {
-	fmt.Println("=== Custom Cloneable Interface Example ===")
+	fmt.Println("=== Custom Cloner Interface Example ===")
 
 	fmt.Println("1. Custom Counter cloning:")
 	original := counter{Value: 10, Name: "main"}
-	cloned := deepclone.Clone(original)
+	cloned := deepclone.MustClone(original)
 
 	fmt.Printf("Original: Value=%d, Name=%s\n", original.Value, original.Name)
 	fmt.Printf("Cloned:   Value=%d, Name=%s\n\n", cloned.Value, cloned.Name)
 
 	fmt.Println("2. Default deep cloning:")
 	person := person{Name: "Alice", Age: 30}
-	clonedPerson := deepclone.Clone(person)
+	clonedPerson := deepclone.MustClone(person)
 
 	person.Name = "Alice Modified"
 	fmt.Printf("Original: Name=%s, Age=%d\n", person.Name, person.Age)

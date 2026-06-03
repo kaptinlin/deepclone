@@ -23,7 +23,7 @@ func TestClonePreservesPointerToStructField(t *testing.T) {
 		original := &holder{Node: node{Value: 7}}
 		original.Ref = &original.Node
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		require.NotNil(t, cloned.Ref)
@@ -45,7 +45,7 @@ func TestClonePreservesPointerToStructField(t *testing.T) {
 		original := &holder{Node: node{Value: 7}}
 		original.Ref = &original.Node
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		require.NotNil(t, cloned.Ref)
@@ -70,7 +70,7 @@ func TestClonePreservesPointerToStructField(t *testing.T) {
 		original := &holder{Wrapper: wrapper{Node: node{Value: 7}}}
 		original.Ref = &original.Wrapper.Node
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		require.NotNil(t, cloned.Ref)
@@ -81,6 +81,33 @@ func TestClonePreservesPointerToStructField(t *testing.T) {
 		assert.Equal(t, 11, cloned.Wrapper.Node.Value)
 		assert.Equal(t, 7, original.Wrapper.Node.Value)
 	})
+}
+
+func TestClonePreservesPointerToArrayElement(t *testing.T) {
+	t.Parallel()
+	type node struct {
+		Value int
+	}
+	type holder struct {
+		Items [2]node
+		Ref   *node
+	}
+
+	original := &holder{
+		Items: [2]node{{Value: 7}, {Value: 9}},
+	}
+	original.Ref = &original.Items[1]
+
+	cloned := MustClone(original)
+
+	require.NotNil(t, cloned)
+	require.NotNil(t, cloned.Ref)
+	assert.False(t, original == cloned)
+	assert.True(t, cloned.Ref == &cloned.Items[1], "pointer to array element should point at the cloned element")
+
+	cloned.Ref.Value = 11
+	assert.Equal(t, 11, cloned.Items[1].Value)
+	assert.Equal(t, 9, original.Items[1].Value)
 }
 
 func TestClonePreservesMapKeysPointingToValueFields(t *testing.T) {
@@ -99,7 +126,7 @@ func TestClonePreservesMapKeysPointingToValueFields(t *testing.T) {
 			&originalHolder.Node: originalHolder,
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.Len(t, cloned, 1)
 		var clonedKey *node
@@ -130,7 +157,7 @@ func TestClonePreservesMapKeysPointingToValueFields(t *testing.T) {
 			{Ref: &originalHolder.Node}: originalHolder,
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.Len(t, cloned, 1)
 		var clonedKey key
@@ -156,7 +183,7 @@ func TestClonePreservesMapKeysPointingToValueFields(t *testing.T) {
 			&originalHolder.Node: originalHolder,
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.Len(t, cloned, 1)
 		var clonedKey *node
@@ -174,4 +201,35 @@ func TestClonePreservesMapKeysPointingToValueFields(t *testing.T) {
 		assert.Equal(t, 11, clonedHolder.Node.Value)
 		assert.Equal(t, 7, originalHolder.Node.Value)
 	})
+}
+
+func TestClonePreservesMapKeyValueSharedPointer(t *testing.T) {
+	t.Parallel()
+	type node struct {
+		Value int
+	}
+
+	shared := &node{Value: 7}
+	original := map[*node]*node{
+		shared: shared,
+	}
+
+	cloned := MustClone(original)
+
+	require.Len(t, cloned, 1)
+	var clonedKey *node
+	var clonedValue *node
+	for key, value := range cloned {
+		clonedKey = key
+		clonedValue = value
+	}
+
+	require.NotNil(t, clonedKey)
+	require.NotNil(t, clonedValue)
+	assert.True(t, clonedKey == clonedValue, "map key and value should share the same cloned pointer")
+	assert.False(t, clonedKey == shared)
+
+	clonedKey.Value = 11
+	assert.Equal(t, 11, clonedValue.Value)
+	assert.Equal(t, 7, shared.Value)
 }

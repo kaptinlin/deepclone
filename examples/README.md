@@ -10,7 +10,7 @@ Demonstrates fundamental cloning operations:
 - Collections (slices, maps)
 - Pointers and pointer chains
 - Complex nested structures
-- Custom cloning with Cloneable interface
+- Custom cloning with Cloner interface
 
 **Run:**
 ```bash
@@ -29,7 +29,7 @@ cd circular && go run main.go
 ```
 
 ### 3. Custom Cloning Examples (`custom/`)
-Demonstrates custom cloning behavior via the Cloneable interface:
+Demonstrates custom cloning behavior via the Cloner interface:
 - Counters with custom increment logic
 - Comparison with default deep cloning
 - Custom vs automatic cloning behavior
@@ -57,11 +57,12 @@ done
 ## Key Learning Points
 
 1. **Zero-allocation paths**: Primitive types are cloned without memory allocation
-2. **Deep independence**: All cloned data is completely independent from the original
+2. **Deep independence**: Supported cloned data is independent from the original
 3. **Circular safety**: Circular references are handled without infinite loops
-4. **Custom behavior**: Implement Cloneable interface for specialized cloning logic
+4. **Error honesty**: Unsupported runtime state is reported by `Clone`
+5. **Custom behavior**: Implement Cloner interface for specialized cloning logic
 
 ## Requirements
 
-- Go 1.21 or later
+- Go 1.26.3 or later
 - DeepClone library installed (`go get github.com/kaptinlin/deepclone`)

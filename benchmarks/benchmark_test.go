@@ -88,7 +88,7 @@ func init() {
 // Benchmark: Int
 func BenchmarkInt_This(b *testing.B) {
 	for b.Loop() {
-		_ = deepclone.Clone(testInt)
+		_, _ = deepclone.Clone(testInt)
 	}
 }
 
@@ -113,7 +113,7 @@ func BenchmarkInt_GolangDesign(b *testing.B) {
 // Benchmark: String
 func BenchmarkString_This(b *testing.B) {
 	for b.Loop() {
-		_ = deepclone.Clone(testString)
+		_, _ = deepclone.Clone(testString)
 	}
 }
 
@@ -138,7 +138,7 @@ func BenchmarkString_GolangDesign(b *testing.B) {
 // Benchmark: Float64
 func BenchmarkFloat_This(b *testing.B) {
 	for b.Loop() {
-		_ = deepclone.Clone(testFloat)
+		_, _ = deepclone.Clone(testFloat)
 	}
 }
 
@@ -163,7 +163,7 @@ func BenchmarkFloat_GolangDesign(b *testing.B) {
 // Benchmark: Bool
 func BenchmarkBool_This(b *testing.B) {
 	for b.Loop() {
-		_ = deepclone.Clone(testBool)
+		_, _ = deepclone.Clone(testBool)
 	}
 }
 
@@ -189,7 +189,7 @@ func BenchmarkBool_GolangDesign(b *testing.B) {
 func BenchmarkSlice100_This(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = deepclone.Clone(testSlice)
+		_, _ = deepclone.Clone(testSlice)
 	}
 }
 
@@ -215,7 +215,7 @@ func BenchmarkSlice100_GolangDesign(b *testing.B) {
 func BenchmarkMap100_This(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = deepclone.Clone(testMap)
+		_, _ = deepclone.Clone(testMap)
 	}
 }
 
@@ -241,7 +241,7 @@ func BenchmarkMap100_GolangDesign(b *testing.B) {
 func BenchmarkSimpleStruct_This(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = deepclone.Clone(testSimple)
+		_, _ = deepclone.Clone(testSimple)
 	}
 }
 
@@ -274,7 +274,7 @@ func BenchmarkSimpleStruct_GolangDesign(b *testing.B) {
 func BenchmarkNestedStruct_This(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		_ = deepclone.Clone(testNested)
+		_, _ = deepclone.Clone(testNested)
 	}
 }
 
@@ -307,7 +307,7 @@ func BenchmarkNestedStruct_GolangDesign(b *testing.B) {
 func BenchmarkPointer_This(b *testing.B) {
 	ptr := &testSimple
 	for b.Loop() {
-		_ = deepclone.Clone(ptr)
+		_, _ = deepclone.Clone(ptr)
 	}
 }
 
@@ -335,7 +335,7 @@ func BenchmarkPointer_GolangDesign(b *testing.B) {
 // Benchmark: Circular Reference
 func BenchmarkCircular_This(b *testing.B) {
 	for b.Loop() {
-		_ = deepclone.Clone(testCircular)
+		_, _ = deepclone.Clone(testCircular)
 	}
 }
 
@@ -363,7 +363,7 @@ func BenchmarkCircular_GolangDesign(b *testing.B) {
 func BenchmarkInterface_This(b *testing.B) {
 	var iface any = testSimple
 	for b.Loop() {
-		_ = deepclone.Clone(iface)
+		_, _ = deepclone.Clone(iface)
 	}
 }
 
@@ -397,7 +397,7 @@ func BenchmarkLargeSlice_This(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		_ = deepclone.Clone(largeSlice)
+		_, _ = deepclone.Clone(largeSlice)
 	}
 }
 

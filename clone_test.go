@@ -3,7 +3,8 @@ package deepclone
 import (
 	"errors"
 	"fmt"
-	"reflect"
+	"os"
+	"sync"
 	"testing"
 	"unsafe"
 
@@ -39,10 +40,22 @@ func TestClonePrimitiveTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := Clone(tt.input)
+			result := MustClone(tt.input)
 			assert.Equal(t, tt.input, result)
 		})
 	}
+}
+
+func TestClonePrimitiveZeroAlloc(t *testing.T) {
+	intAllocs := testing.AllocsPerRun(1000, func() {
+		_, _ = Clone(42)
+	})
+	stringAllocs := testing.AllocsPerRun(1000, func() {
+		_, _ = Clone("deepclone")
+	})
+
+	assert.Zero(t, intAllocs)
+	assert.Zero(t, stringAllocs)
 }
 
 func TestCloneSlices(t *testing.T) {
@@ -50,7 +63,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("int slice", func(t *testing.T) {
 		t.Parallel()
 		original := []int{1, 2, 3, 4, 5}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -66,7 +79,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("string slice", func(t *testing.T) {
 		t.Parallel()
 		original := []string{"hello", "world", "test"}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -78,7 +91,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("int8 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []int8{1, -2, 3}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -91,7 +104,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("int16 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []int16{100, -200, 300}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -104,7 +117,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("int32 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []int32{100000, -200000, 300000}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -117,7 +130,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("int64 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []int64{1e12, -2e12, 3e12}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -130,7 +143,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("uint slice", func(t *testing.T) {
 		t.Parallel()
 		original := []uint{1, 2, 3}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -143,7 +156,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("uint16 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []uint16{100, 200, 300}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -156,7 +169,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("uint32 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []uint32{100000, 200000, 300000}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -169,7 +182,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("uint64 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []uint64{1e12, 2e12, 3e12}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -182,7 +195,7 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("float32 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []float32{1.1, 2.2, 3.3}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -195,44 +208,44 @@ func TestCloneSlices(t *testing.T) {
 	t.Run("nil slice types", func(t *testing.T) {
 		t.Parallel()
 		var nilInt8 []int8
-		assert.Nil(t, Clone(nilInt8))
+		assert.Nil(t, MustClone(nilInt8))
 
 		var nilInt16 []int16
-		assert.Nil(t, Clone(nilInt16))
+		assert.Nil(t, MustClone(nilInt16))
 
 		var nilInt32 []int32
-		assert.Nil(t, Clone(nilInt32))
+		assert.Nil(t, MustClone(nilInt32))
 
 		var nilInt64 []int64
-		assert.Nil(t, Clone(nilInt64))
+		assert.Nil(t, MustClone(nilInt64))
 
 		var nilUint []uint
-		assert.Nil(t, Clone(nilUint))
+		assert.Nil(t, MustClone(nilUint))
 
 		var nilUint16 []uint16
-		assert.Nil(t, Clone(nilUint16))
+		assert.Nil(t, MustClone(nilUint16))
 
 		var nilUint32 []uint32
-		assert.Nil(t, Clone(nilUint32))
+		assert.Nil(t, MustClone(nilUint32))
 
 		var nilUint64 []uint64
-		assert.Nil(t, Clone(nilUint64))
+		assert.Nil(t, MustClone(nilUint64))
 
 		var nilFloat32 []float32
-		assert.Nil(t, Clone(nilFloat32))
+		assert.Nil(t, MustClone(nilFloat32))
 	})
 
 	t.Run("nil slice", func(t *testing.T) {
 		t.Parallel()
 		var original []int
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("empty slice", func(t *testing.T) {
 		t.Parallel()
 		original := []int{}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
 		}
@@ -250,7 +263,7 @@ func TestCloneMaps(t *testing.T) {
 			"two":   2,
 			"three": 3,
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -267,7 +280,7 @@ func TestCloneMaps(t *testing.T) {
 			"pi": 3.14159,
 			"e":  2.71828,
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -283,7 +296,7 @@ func TestCloneMaps(t *testing.T) {
 			"active":  true,
 			"deleted": false,
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -299,7 +312,7 @@ func TestCloneMaps(t *testing.T) {
 			1: "one",
 			2: "two",
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -315,7 +328,7 @@ func TestCloneMaps(t *testing.T) {
 			1: true,
 			2: false,
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -328,29 +341,29 @@ func TestCloneMaps(t *testing.T) {
 	t.Run("nil map types", func(t *testing.T) {
 		t.Parallel()
 		var nilStringFloat64 map[string]float64
-		assert.Nil(t, Clone(nilStringFloat64))
+		assert.Nil(t, MustClone(nilStringFloat64))
 
 		var nilStringBool map[string]bool
-		assert.Nil(t, Clone(nilStringBool))
+		assert.Nil(t, MustClone(nilStringBool))
 
 		var nilIntString map[int]string
-		assert.Nil(t, Clone(nilIntString))
+		assert.Nil(t, MustClone(nilIntString))
 
 		var nilIntBool map[int]bool
-		assert.Nil(t, Clone(nilIntBool))
+		assert.Nil(t, MustClone(nilIntBool))
 	})
 
 	t.Run("nil map", func(t *testing.T) {
 		t.Parallel()
 		var original map[string]int
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("empty map", func(t *testing.T) {
 		t.Parallel()
 		original := make(map[string]int)
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
 		}
@@ -363,7 +376,7 @@ func TestCloneMaps(t *testing.T) {
 
 		originalKey := &Key{ID: 1}
 		original := map[*Key][]int{originalKey: {1, 2, 3}}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.Len(t, cloned, 1)
 
@@ -394,7 +407,7 @@ func TestClonePointers(t *testing.T) {
 		t.Parallel()
 		value := 42
 		original := &value
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		assert.Equal(t, *original, *cloned)
@@ -408,7 +421,7 @@ func TestClonePointers(t *testing.T) {
 	t.Run("nil pointer", func(t *testing.T) {
 		t.Parallel()
 		var original *int
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
@@ -417,7 +430,7 @@ func TestClonePointers(t *testing.T) {
 		value := 42
 		ptr1 := &value
 		original := &ptr1
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		require.NotNil(t, *cloned)
@@ -440,7 +453,7 @@ func TestCloneStructs(t *testing.T) {
 			Name: "John",
 			Age:  30,
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -465,7 +478,7 @@ func TestCloneStructs(t *testing.T) {
 			Config: map[string]string{"key": "value"},
 			Ptr:    &value,
 		}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -488,7 +501,7 @@ func TestCloneArrays(t *testing.T) {
 	t.Run("int array", func(t *testing.T) {
 		t.Parallel()
 		original := [3]int{1, 2, 3}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -502,7 +515,7 @@ func TestCloneArrays(t *testing.T) {
 	t.Run("nested array", func(t *testing.T) {
 		t.Parallel()
 		original := [2][]int{{1, 2}, {3, 4}}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -514,25 +527,25 @@ func TestCloneArrays(t *testing.T) {
 	})
 }
 
-// TestCloneableInterface tests custom cloning behavior
-func TestCloneableInterface(t *testing.T) {
+// TestClonerInterface tests custom cloning behavior.
+func TestClonerInterface(t *testing.T) {
 	t.Parallel()
-	t.Run("custom cloneable", func(t *testing.T) {
+	t.Run("custom cloner", func(t *testing.T) {
 		t.Parallel()
 		original := CustomType{Value: "test"}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		expected := CustomType{Value: "test_cloned"}
 		if diff := cmp.Diff(expected, cloned); diff != "" {
-			t.Errorf("Cloneable result mismatch (-want +got):\n%s", diff)
+			t.Errorf("Cloner result mismatch (-want +got):\n%s", diff)
 		}
 	})
 
 	t.Run("nil pointer", func(t *testing.T) {
 		t.Parallel()
-		var original *nilCloneable
+		var original *nilCloner
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		assert.Nil(t, cloned)
 	})
@@ -540,25 +553,25 @@ func TestCloneableInterface(t *testing.T) {
 	t.Run("convertible clone result", func(t *testing.T) {
 		t.Parallel()
 		calls := 0
-		original := convertibleCloneable{Value: "test", calls: &calls}
+		original := convertibleCloner{Value: "test", calls: &calls}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		assert.Equal(t, "test_cloned", cloned.Value)
 		assert.Equal(t, 1, calls)
 	})
 }
 
-// CustomType implements Cloneable interface
+// CustomType implements Cloner.
 type CustomType struct {
 	Value string
 }
 
-func (c CustomType) Clone() any {
-	return CustomType{Value: c.Value + "_cloned"}
+func (c CustomType) Clone() (CustomType, error) {
+	return CustomType{Value: c.Value + "_cloned"}, nil
 }
 
-type convertibleCloneable struct {
+type convertibleCloner struct {
 	Value string
 	calls *int
 }
@@ -568,15 +581,15 @@ type convertibleCloneResult struct {
 	calls *int
 }
 
-func (c convertibleCloneable) Clone() any {
+func (c convertibleCloner) Clone() (convertibleCloneResult, error) {
 	(*c.calls)++
-	return convertibleCloneResult{Value: c.Value + "_cloned", calls: c.calls}
+	return convertibleCloneResult{Value: c.Value + "_cloned", calls: c.calls}, nil
 }
 
-type nilCloneable struct{}
+type nilCloner struct{}
 
-func (*nilCloneable) Clone() any {
-	panic("nil cloneable should not be cloned")
+func (*nilCloner) Clone() (*nilCloner, error) {
+	panic("nil cloner should not be cloned")
 }
 
 // TestCloneCircularReference tests circular reference detection
@@ -596,7 +609,7 @@ func TestCloneCircularReference(t *testing.T) {
 		node2.Next = node1
 
 		// This should not panic or cause infinite loop
-		cloned := Clone(node1)
+		cloned := MustClone(node1)
 
 		// Verify structure is preserved
 		require.NotNil(t, cloned)
@@ -624,7 +637,7 @@ func TestCloneCircularReference(t *testing.T) {
 		original := &SelfRef{Value: 42}
 		original.Self = original
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		assert.Equal(t, 42, cloned.Value)
@@ -644,7 +657,7 @@ func TestCloneCircularReference(t *testing.T) {
 		container1.Items = []*Container{container2}
 		container2.Items = []*Container{container1}
 
-		cloned := Clone(container1)
+		cloned := MustClone(container1)
 
 		require.NotNil(t, cloned)
 		require.Len(t, cloned.Items, 1)
@@ -660,14 +673,14 @@ func TestCloneEdgeCases(t *testing.T) {
 	t.Run("nil interface", func(t *testing.T) {
 		t.Parallel()
 		var original any
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("nil pointer to interface", func(t *testing.T) {
 		t.Parallel()
 		var original *any
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
@@ -675,35 +688,36 @@ func TestCloneEdgeCases(t *testing.T) {
 		t.Parallel()
 		var nilPtr *int
 		var original any = nilPtr
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("deeply nested nil pointers", func(t *testing.T) {
 		t.Parallel()
 		var original ***int
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned)
 	})
 
 	t.Run("struct with unexported fields", func(t *testing.T) {
 		t.Parallel()
 		type StructWithUnexported struct {
-			Public    string
-			Protected int // exported field
+			Public string
+			Values []int
+			hidden int
 		}
 
-		// Note: We can't directly set unexported fields from outside the package
-		// but this test verifies the cloning handles them gracefully
 		original := StructWithUnexported{
-			Public:    "visible",
-			Protected: 42,
+			Public: "visible",
+			Values: []int{1, 2, 3},
+			hidden: 42,
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Equal(t, "visible", cloned.Public)
-		assert.Equal(t, 42, cloned.Protected)
-		// unexported fields would remain zero value since they can't be accessed
+		assert.Equal(t, 42, cloned.hidden)
+		cloned.Values[0] = 99
+		assert.Equal(t, 1, original.Values[0])
 	})
 
 	t.Run("large slice", func(t *testing.T) {
@@ -713,7 +727,7 @@ func TestCloneEdgeCases(t *testing.T) {
 			original[i] = i
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Equal(t, len(original), len(cloned))
 		assert.Equal(t, cap(original), cap(cloned))
 
@@ -734,7 +748,7 @@ func TestCloneEdgeCases(t *testing.T) {
 			"valid": func() *int { i := 42; return &i }(),
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		assert.Nil(t, cloned["nil"])
 		require.NotNil(t, cloned["valid"])
 		assert.Equal(t, 42, *cloned["valid"])
@@ -756,7 +770,7 @@ func TestCloneEdgeCases(t *testing.T) {
 		for i, original := range tests {
 			t.Run(fmt.Sprintf("type_%d", i), func(t *testing.T) {
 				t.Parallel()
-				cloned := Clone(original)
+				cloned := MustClone(original)
 				if diff := cmp.Diff(original, cloned); diff != "" {
 					t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
 				}
@@ -766,26 +780,39 @@ func TestCloneEdgeCases(t *testing.T) {
 
 	t.Run("channel types", func(t *testing.T) {
 		t.Parallel()
-		// Unbuffered channel
 		original := make(chan int)
-		cloned := Clone(original)
-
-		// Channels can't be meaningfully cloned, should get zero value
+		cloned, err := Clone(original)
+		require.Error(t, err)
 		assert.Nil(t, cloned)
+		assert.Contains(t, err.Error(), "channels cannot be cloned")
 
-		// Buffered channel
 		buffered := make(chan string, 5)
-		clonedBuffered := Clone(buffered)
+		clonedBuffered, err := Clone(buffered)
+		require.Error(t, err)
 		assert.Nil(t, clonedBuffered)
+		assert.Contains(t, err.Error(), "channels cannot be cloned")
 	})
 
 	t.Run("function types", func(t *testing.T) {
 		t.Parallel()
 		original := func(x int) int { return x * 2 }
-		cloned := Clone(original)
+		cloned, err := Clone(original)
+		require.Error(t, err)
+		assert.Nil(t, cloned)
+		assert.Contains(t, err.Error(), "functions cannot be cloned")
+	})
 
-		// Functions should be returned as-is (same reference)
-		assert.True(t, reflect.ValueOf(original).Pointer() == reflect.ValueOf(cloned).Pointer())
+	t.Run("nil channel and function types", func(t *testing.T) {
+		t.Parallel()
+		var ch chan int
+		clonedCh, err := Clone(ch)
+		require.NoError(t, err)
+		assert.Nil(t, clonedCh)
+
+		var fn func() int
+		clonedFn, err := Clone(fn)
+		require.NoError(t, err)
+		assert.Nil(t, clonedFn)
 	})
 
 	t.Run("complex nested structure", func(t *testing.T) {
@@ -829,7 +856,7 @@ func TestCloneEdgeCases(t *testing.T) {
 		friend := &Person{Name: "Friend", Age: 25, Parent: parent}
 		original.Friends = []*Person{friend}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		// Verify all fields are properly cloned
 		assert.Equal(t, original.Name, cloned.Name)
@@ -891,7 +918,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.NotNil(t, cloned)
 		require.NotNil(t, cloned["key"])
 		assert.Equal(t, "test", cloned["key"].Name)
@@ -920,7 +947,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.NotNil(t, cloned.Field)
 		assert.Equal(t, 42, cloned.Field.Value)
 
@@ -950,7 +977,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.NotNil(t, cloned)
 		require.NotNil(t, cloned["prop1"])
 		require.NotNil(t, cloned["prop2"])
@@ -979,7 +1006,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		node2.Next = node1
 
 		// Should not panic and maintain circular reference
-		cloned := Clone(node1)
+		cloned := MustClone(node1)
 		require.NotNil(t, cloned)
 		assert.Equal(t, 1, cloned.Value)
 		require.NotNil(t, cloned.Next)
@@ -1005,7 +1032,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.Len(t, cloned, 3)
 		assert.Equal(t, 1, cloned[0].ID)
 		assert.Equal(t, "first", cloned[0].Name)
@@ -1038,7 +1065,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.NotNil(t, cloned)
 		require.NotNil(t, cloned["key1"])
 		require.NotNil(t, cloned["key2"])
@@ -1073,7 +1100,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.NotNil(t, cloned.Items)
 		assert.Equal(t, 42, cloned.Items["int"].Value)
 		assert.Equal(t, "test", cloned.Items["string"].Value)
@@ -1104,7 +1131,7 @@ func TestCloneTypeAliases(t *testing.T) {
 		}
 
 		// Should not panic during cloning
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		require.NotNil(t, cloned)
 		assert.Equal(t, "test1", cloned["a"].Value)
 		assert.Equal(t, "test2", cloned["b"].Value)
@@ -1116,20 +1143,22 @@ func TestCloneTypeAliases(t *testing.T) {
 	})
 }
 
-// TestCloneUnexportedComplexFields tests structs with unexported fields
-// of complex types (slice, map, pointer) to cover the unexported field
-// skip path in getStructTypeInfo and cloneStruct.
-func TestCloneUnexportedComplexFields(t *testing.T) {
+// TestCloneUnexportedReferenceFieldsRejectsMutableState covers unexported
+// reference-like fields that cannot be safely deep-cloned without unsafe.
+func TestCloneUnexportedReferenceFieldsRejectsMutableState(t *testing.T) {
 	t.Parallel()
 	type withUnexportedSlice struct {
 		Public string
-		hidden []int //nolint:unused // exercising unexported field path
+		hidden []int
 	}
 
-	original := withUnexportedSlice{Public: "visible"}
-	cloned := Clone(original)
+	_, err := Clone(withUnexportedSlice{Public: "visible", hidden: []int{1}})
+	require.Error(t, err)
 
-	assert.Equal(t, "visible", cloned.Public)
+	var unsupported *UnsupportedError
+	require.ErrorAs(t, err, &unsupported)
+	assert.Equal(t, "$.hidden", unsupported.Path)
+	assert.Equal(t, "unexported reference-like fields cannot be cloned", unsupported.Reason)
 }
 
 // TestCloneAdditionalSliceFastPaths covers the fast paths for []float64,
@@ -1139,7 +1168,7 @@ func TestCloneAdditionalSliceFastPaths(t *testing.T) {
 	t.Run("float64 slice", func(t *testing.T) {
 		t.Parallel()
 		original := []float64{1.1, 2.2, 3.3}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -1152,7 +1181,7 @@ func TestCloneAdditionalSliceFastPaths(t *testing.T) {
 	t.Run("bool slice", func(t *testing.T) {
 		t.Parallel()
 		original := []bool{true, false, true}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -1165,7 +1194,7 @@ func TestCloneAdditionalSliceFastPaths(t *testing.T) {
 	t.Run("byte slice", func(t *testing.T) {
 		t.Parallel()
 		original := []byte{0x01, 0x02, 0x03}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
@@ -1178,19 +1207,19 @@ func TestCloneAdditionalSliceFastPaths(t *testing.T) {
 	t.Run("nil float64 slice", func(t *testing.T) {
 		t.Parallel()
 		var original []float64
-		assert.Nil(t, Clone(original))
+		assert.Nil(t, MustClone(original))
 	})
 
 	t.Run("nil bool slice", func(t *testing.T) {
 		t.Parallel()
 		var original []bool
-		assert.Nil(t, Clone(original))
+		assert.Nil(t, MustClone(original))
 	})
 
 	t.Run("nil byte slice", func(t *testing.T) {
 		t.Parallel()
 		var original []byte
-		assert.Nil(t, Clone(original))
+		assert.Nil(t, MustClone(original))
 	})
 }
 
@@ -1201,25 +1230,25 @@ func TestCloneNilMapFastPaths(t *testing.T) {
 	t.Run("nil map[string]string", func(t *testing.T) {
 		t.Parallel()
 		var original map[string]string
-		assert.Nil(t, Clone(original))
+		assert.Nil(t, MustClone(original))
 	})
 
 	t.Run("nil map[string]int", func(t *testing.T) {
 		t.Parallel()
 		var original map[string]int
-		assert.Nil(t, Clone(original))
+		assert.Nil(t, MustClone(original))
 	})
 
 	t.Run("nil map[int]int", func(t *testing.T) {
 		t.Parallel()
 		var original map[int]int
-		assert.Nil(t, Clone(original))
+		assert.Nil(t, MustClone(original))
 	})
 
 	t.Run("non-nil map[string]string", func(t *testing.T) {
 		t.Parallel()
 		original := map[string]string{"a": "b"}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
 		}
@@ -1230,7 +1259,7 @@ func TestCloneNilMapFastPaths(t *testing.T) {
 	t.Run("non-nil map[int]int", func(t *testing.T) {
 		t.Parallel()
 		original := map[int]int{1: 10, 2: 20}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 		if diff := cmp.Diff(original, cloned); diff != "" {
 			t.Errorf("Clone() mismatch (-want +got):\n%s", diff)
 		}
@@ -1248,7 +1277,7 @@ func TestCloneCircularMapReference(t *testing.T) {
 	m := map[string]any{"key": "value"}
 	m["self"] = m // self-referencing map
 
-	cloned := Clone(m)
+	cloned := MustClone(m)
 
 	require.NotNil(t, cloned)
 	assert.Equal(t, "value", cloned["key"])
@@ -1269,7 +1298,7 @@ func TestCloneCircularSliceReference(t *testing.T) {
 	s[0] = "value"
 	s[1] = s // self-referencing slice
 
-	cloned := Clone(s)
+	cloned := MustClone(s)
 
 	require.Len(t, cloned, 2)
 	assert.Equal(t, "value", cloned[0])
@@ -1286,7 +1315,7 @@ func TestCloneCircularSliceThroughArrayElement(t *testing.T) {
 	original := make([][1]any, 1)
 	original[0][0] = original
 
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	require.Len(t, cloned, 1)
 	inner, ok := cloned[0][0].([][1]any)
@@ -1308,7 +1337,7 @@ func TestCloneSharedMapReference(t *testing.T) {
 
 	shared := map[string]any{"key": "value"}
 	original := TwoMaps{A: shared, B: shared}
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	assert.Equal(t, "value", cloned.A["key"])
 	assert.Equal(t, "value", cloned.B["key"])
@@ -1331,7 +1360,7 @@ func TestCloneSharedSliceReference(t *testing.T) {
 
 	shared := []any{"x", "y"}
 	original := TwoSlices{A: shared, B: shared}
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	if diff := cmp.Diff([]any{"x", "y"}, cloned.A); diff != "" {
 		t.Errorf("shared slice field A mismatch (-want +got):\n%s", diff)
@@ -1358,7 +1387,7 @@ func TestCloneMapTypeAliasConversions(t *testing.T) {
 		// the concrete type may differ from the map's element type (any),
 		// exercising the ConvertibleTo branch.
 		original := map[string]MyInt{"key": 42}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned)
 		assert.Equal(t, MyInt(42), cloned["key"])
@@ -1379,7 +1408,7 @@ func TestCloneStructFieldTypeConversion(t *testing.T) {
 	}
 
 	original := Outer{Field: Inner{Value: 42}}
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	assert.Equal(t, 42, cloned.Field.Value)
 }
@@ -1391,28 +1420,27 @@ func TestCloneComplexPrimitives(t *testing.T) {
 	t.Run("complex64", func(t *testing.T) {
 		t.Parallel()
 		v := complex(float32(1.0), float32(2.0))
-		cloned := Clone(v)
+		cloned := MustClone(v)
 		assert.Equal(t, v, cloned)
 	})
 
 	t.Run("complex128", func(t *testing.T) {
 		t.Parallel()
 		v := complex(1.0, 2.0)
-		cloned := Clone(v)
+		cloned := MustClone(v)
 		assert.Equal(t, v, cloned)
 	})
 
 	t.Run("uintptr", func(t *testing.T) {
 		t.Parallel()
 		v := uintptr(0xDEADBEEF)
-		cloned := Clone(v)
+		cloned := MustClone(v)
 		assert.Equal(t, v, cloned)
 	})
 }
 
-// TestCloneChannelViaReflection covers the channel zero-value return
-// path in cloneValue when a channel is inside an interface (goes through
-// cloneValue rather than the struct copyField fast path).
+// TestCloneChannelViaReflection covers the channel rejection path in
+// cloneValue when a channel is inside an interface.
 func TestCloneChannelViaReflection(t *testing.T) {
 	t.Parallel()
 	type WithInterface struct {
@@ -1421,10 +1449,10 @@ func TestCloneChannelViaReflection(t *testing.T) {
 
 	ch := make(chan int, 5)
 	original := WithInterface{Value: ch}
-	cloned := Clone(original)
-
-	// Channel inside interface goes through cloneValue → reflect.Zero
-	assert.Nil(t, cloned.Value)
+	cloned, err := Clone(original)
+	require.Error(t, err)
+	assert.Zero(t, cloned)
+	assert.Contains(t, err.Error(), "channels cannot be cloned")
 }
 
 func TestCloneStructChannelFieldZeroed(t *testing.T) {
@@ -1435,14 +1463,14 @@ func TestCloneStructChannelFieldZeroed(t *testing.T) {
 	}
 
 	original := WithChannel{Name: "events", Ch: make(chan int, 1)}
-	cloned := Clone(original)
-
-	assert.Equal(t, "events", cloned.Name)
-	assert.Nil(t, cloned.Ch)
+	cloned, err := Clone(original)
+	require.Error(t, err)
+	assert.Zero(t, cloned)
+	assert.Contains(t, err.Error(), "channels cannot be cloned")
 }
 
-// TestCloneFuncViaReflection covers the function as-is return path
-// in cloneValue when a func is inside a struct.
+// TestCloneFuncViaReflection covers the function rejection path in cloneValue
+// when a func is inside a struct.
 func TestCloneFuncViaReflection(t *testing.T) {
 	t.Parallel()
 	type WithFunc struct {
@@ -1452,13 +1480,10 @@ func TestCloneFuncViaReflection(t *testing.T) {
 
 	fn := func() int { return 42 }
 	original := WithFunc{Fn: fn, Name: "test"}
-	cloned := Clone(original)
-
-	assert.Equal(t, "test", cloned.Name)
-	// Function should be returned as-is (same reference)
-	assert.Equal(t,
-		reflect.ValueOf(original.Fn).Pointer(),
-		reflect.ValueOf(cloned.Fn).Pointer())
+	cloned, err := Clone(original)
+	require.Error(t, err)
+	assert.Zero(t, cloned)
+	assert.Contains(t, err.Error(), "functions cannot be cloned")
 }
 
 // TestCloneNilInterface covers the nil interface return path in
@@ -1472,7 +1497,7 @@ func TestCloneNilInterface(t *testing.T) {
 	t.Run("nil interface value", func(t *testing.T) {
 		t.Parallel()
 		original := WithInterface{Value: nil}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		assert.Nil(t, cloned.Value)
 	})
@@ -1481,7 +1506,7 @@ func TestCloneNilInterface(t *testing.T) {
 		t.Parallel()
 		var value *int
 		original := WithInterface{Value: value}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		clonedValue, ok := cloned.Value.(*int)
 		require.True(t, ok)
@@ -1489,15 +1514,15 @@ func TestCloneNilInterface(t *testing.T) {
 	})
 }
 
-type nestedCloneable struct {
+type nestedCloner struct {
 	Value string
 }
 
-func (n nestedCloneable) Clone() any {
-	return nestedCloneable{Value: n.Value + " cloned"}
+func (n nestedCloner) Clone() (nestedCloner, error) {
+	return nestedCloner{Value: n.Value + " cloned"}, nil
 }
 
-type replacementCloneable struct {
+type replacementCloner struct {
 	Value string
 }
 
@@ -1505,84 +1530,81 @@ type replacementCloneResult struct {
 	Value string
 }
 
-func (r replacementCloneable) Clone() any {
-	return replacementCloneResult{Value: r.Value + " cloned"}
+func (r replacementCloner) Clone() (replacementCloneResult, error) {
+	return replacementCloneResult{Value: r.Value + " cloned"}, nil
 }
 
-func TestCloneNestedCloneableValues(t *testing.T) {
+func TestCloneNestedClonerValues(t *testing.T) {
 	t.Parallel()
 	type Holder struct {
-		Field nestedCloneable
+		Field nestedCloner
 		Iface any
 		Map   map[string]any
 		Slice []any
 	}
 
 	original := Holder{
-		Field: nestedCloneable{Value: "field"},
-		Iface: nestedCloneable{Value: "iface"},
-		Map:   map[string]any{"item": nestedCloneable{Value: "map"}},
-		Slice: []any{nestedCloneable{Value: "slice"}},
+		Field: nestedCloner{Value: "field"},
+		Iface: nestedCloner{Value: "iface"},
+		Map:   map[string]any{"item": nestedCloner{Value: "map"}},
+		Slice: []any{nestedCloner{Value: "slice"}},
 	}
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	assert.Equal(t, "field cloned", cloned.Field.Value)
-	assert.Equal(t, "iface cloned", cloned.Iface.(nestedCloneable).Value)
-	assert.Equal(t, "map cloned", cloned.Map["item"].(nestedCloneable).Value)
-	assert.Equal(t, "slice cloned", cloned.Slice[0].(nestedCloneable).Value)
+	assert.Equal(t, "iface cloned", cloned.Iface.(nestedCloner).Value)
+	assert.Equal(t, "map cloned", cloned.Map["item"].(nestedCloner).Value)
+	assert.Equal(t, "slice cloned", cloned.Slice[0].(nestedCloner).Value)
 }
 
-func TestCloneInterfaceUsesAssignableCloneableResult(t *testing.T) {
+func TestCloneInterfaceUsesConvertibleClonerResult(t *testing.T) {
 	t.Parallel()
-	t.Run("non-nil cloneable", func(t *testing.T) {
+	t.Run("non-nil cloner", func(t *testing.T) {
 		t.Parallel()
 		original := map[string]any{
-			"item": replacementCloneable{Value: "interface"},
+			"item": replacementCloner{Value: "interface"},
 		}
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
-		result, ok := cloned["item"].(replacementCloneResult)
+		result, ok := cloned["item"].(replacementCloner)
 		require.True(t, ok)
 		assert.Equal(t, "interface cloned", result.Value)
 	})
 
-	t.Run("typed nil cloneable pointer", func(t *testing.T) {
+	t.Run("typed nil cloner pointer", func(t *testing.T) {
 		t.Parallel()
-		var item *nilCloneable
+		var item *nilCloner
 		original := map[string]any{"item": item}
 
 		var cloned map[string]any
 		require.NotPanics(t, func() {
-			cloned = Clone(original)
+			cloned = MustClone(original)
 		})
 
-		clonedItem, ok := cloned["item"].(*nilCloneable)
+		clonedItem, ok := cloned["item"].(*nilCloner)
 		require.True(t, ok)
 		assert.Nil(t, clonedItem)
 	})
 }
 
-// TestCloneCloneableReturnsWrongType covers the path where a Cloneable
-// implementation returns a type that doesn't match T, falling through
-// to reflection-based cloning.
-func TestCloneCloneableReturnsWrongType(t *testing.T) {
+// TestCloneIgnoresNonConformingCloneMethod covers a Clone method that does not
+// satisfy Cloner[T]. It should be ignored and cloned through reflection.
+func TestCloneIgnoresNonConformingCloneMethod(t *testing.T) {
 	t.Parallel()
-	original := &WrongTypeCloneable{Value: "test"}
-	cloned := Clone(original)
+	original := &WrongTypeCloneMethod{Value: "test"}
+	cloned, err := Clone(original)
 
+	require.NoError(t, err)
 	require.NotNil(t, cloned)
-	// The Cloneable returns a string, which can't be asserted to
-	// *WrongTypeCloneable, so it falls through to reflection cloning.
 	assert.Equal(t, "test", cloned.Value)
 }
 
-// WrongTypeCloneable implements Cloneable but returns a different type.
-type WrongTypeCloneable struct {
+type WrongTypeCloneMethod struct {
 	Value string
 }
 
-func (w *WrongTypeCloneable) Clone() any {
+func (w *WrongTypeCloneMethod) Clone() any {
 	return "not the right type"
 }
 
@@ -1602,7 +1624,7 @@ func TestCloneSliceSubSliceAliasing(t *testing.T) {
 	sub := full[:2]
 
 	original := &TwoSlices{Full: full, Sub: sub}
-	cloned := Clone(original)
+	cloned := MustClone(original)
 
 	require.NotNil(t, cloned)
 	assert.Len(t, cloned.Full, 3)
@@ -1629,7 +1651,7 @@ func TestClonePointerToSliceElementDoesNotCollideWithSlice(t *testing.T) {
 
 		var cloned Holder
 		require.NotPanics(t, func() {
-			cloned = Clone(original)
+			cloned = MustClone(original)
 		})
 		require.NotNil(t, cloned.First)
 		assert.Equal(t, 1, cloned.First.Value)
@@ -1647,7 +1669,7 @@ func TestClonePointerToSliceElementDoesNotCollideWithSlice(t *testing.T) {
 
 		items := []node{{Value: 1}, {Value: 2}}
 		original := Holder{Items: items, First: &items[0]}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		require.NotNil(t, cloned.First)
 		assert.Equal(t, 1, cloned.First.Value)
@@ -1657,15 +1679,15 @@ func TestClonePointerToSliceElementDoesNotCollideWithSlice(t *testing.T) {
 	})
 }
 
-type panicCloneable struct{}
+type panicCloner struct{}
 
-var errPanicCloneable = errors.New("panic cloneable")
+var errPanicCloner = errors.New("panic cloner")
 
-func (panicCloneable) Clone() any {
-	panic(errPanicCloneable)
+func (panicCloner) Clone() (panicCloner, error) {
+	panic(errPanicCloner)
 }
 
-func TestCloneablePanicPropagates(t *testing.T) {
+func TestClonerPanicPropagates(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		r := recover()
@@ -1673,25 +1695,39 @@ func TestCloneablePanicPropagates(t *testing.T) {
 
 		err, ok := r.(error)
 		require.True(t, ok)
-		assert.ErrorIs(t, err, errPanicCloneable)
+		assert.ErrorIs(t, err, errPanicCloner)
 	}()
 
-	Clone(panicCloneable{})
+	MustClone(panicCloner{})
 }
 
-// TestCloneUnsafePointer covers the unsafe.Pointer as-is return path
-// in cloneValue. unsafe.Pointer is an opaque type that cannot be
-// meaningfully deep cloned, so it is copied by value (same address).
+type errorCloner struct{}
+
+var errCloner = errors.New("cloner error")
+
+func (errorCloner) Clone() (errorCloner, error) {
+	return errorCloner{}, errCloner
+}
+
+func TestClonerErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	_, err := Clone(errorCloner{})
+	require.ErrorIs(t, err, errCloner)
+}
+
+// TestCloneUnsafePointer covers the unsafe.Pointer rejection path.
 func TestCloneUnsafePointer(t *testing.T) {
 	t.Parallel()
 	t.Run("direct via interface", func(t *testing.T) {
 		t.Parallel()
 		x := 42
 		ptr := unsafe.Pointer(&x)
-		cloned := Clone(ptr)
+		cloned, err := Clone(ptr)
 
-		// unsafe.Pointer should be copied as-is (same address).
-		assert.Equal(t, ptr, cloned)
+		require.Error(t, err)
+		assert.Nil(t, cloned)
+		assert.Contains(t, err.Error(), "unsafe pointers cannot be cloned")
 	})
 
 	t.Run("struct field", func(t *testing.T) {
@@ -1706,11 +1742,11 @@ func TestCloneUnsafePointer(t *testing.T) {
 			Ptr:  unsafe.Pointer(&x),
 			Name: "test",
 		}
-		cloned := Clone(original)
+		cloned, err := Clone(original)
 
-		assert.Equal(t, "test", cloned.Name)
-		// unsafe.Pointer field should be copied by value.
-		assert.Equal(t, original.Ptr, cloned.Ptr)
+		require.Error(t, err)
+		assert.Zero(t, cloned)
+		assert.Contains(t, err.Error(), "unsafe pointers cannot be cloned")
 	})
 
 	t.Run("nil unsafe pointer", func(t *testing.T) {
@@ -1720,7 +1756,7 @@ func TestCloneUnsafePointer(t *testing.T) {
 		}
 
 		original := WithUnsafePointer{Ptr: nil}
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		assert.Equal(t, unsafe.Pointer(nil), cloned.Ptr)
 	})
@@ -1734,11 +1770,126 @@ func TestCloneUnsafePointer(t *testing.T) {
 		x := 7
 		ptr := unsafe.Pointer(&x)
 		original := WithInterface{Value: ptr}
-		cloned := Clone(original)
+		cloned, err := Clone(original)
 
-		// unsafe.Pointer inside interface goes through
-		// cloneValue and should be returned as-is.
-		assert.Equal(t, ptr, cloned.Value)
+		require.Error(t, err)
+		assert.Zero(t, cloned)
+		assert.Contains(t, err.Error(), "unsafe pointers cannot be cloned")
+	})
+}
+
+func TestCloneUnsupportedErrorDetails(t *testing.T) {
+	t.Parallel()
+	type withChannel struct {
+		Ch chan int
+	}
+
+	_, err := Clone(withChannel{Ch: make(chan int)})
+	require.Error(t, err)
+
+	var unsupported *UnsupportedError
+	require.ErrorAs(t, err, &unsupported)
+	assert.Equal(t, "$.Ch", unsupported.Path)
+	assert.Equal(t, "channels cannot be cloned", unsupported.Reason)
+}
+
+func TestCloneRejectsRuntimeState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("sync primitive", func(t *testing.T) {
+		t.Parallel()
+		type withMutex struct {
+			Mu sync.Mutex
+		}
+
+		_, err := Clone(withMutex{})
+		require.Error(t, err)
+
+		var unsupported *UnsupportedError
+		require.ErrorAs(t, err, &unsupported)
+		assert.Equal(t, "$.Mu", unsupported.Path)
+		assert.Equal(t, "sync primitives cannot be cloned", unsupported.Reason)
+	})
+
+	t.Run("file handle", func(t *testing.T) {
+		t.Parallel()
+		file, err := os.CreateTemp(t.TempDir(), "deepclone-*")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, file.Close())
+		})
+
+		type withFile struct {
+			File *os.File
+		}
+
+		_, err = Clone(withFile{File: file})
+		require.Error(t, err)
+
+		var unsupported *UnsupportedError
+		require.ErrorAs(t, err, &unsupported)
+		assert.Equal(t, "$.File", unsupported.Path)
+		assert.Equal(t, "files cannot be cloned", unsupported.Reason)
+	})
+}
+
+func TestCloneUnsupportedErrorPathIncludesIndexAndMapKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("slice index", func(t *testing.T) {
+		t.Parallel()
+		values := []any{"ok", make(chan int)}
+
+		_, err := Clone(values)
+		require.Error(t, err)
+
+		var unsupported *UnsupportedError
+		require.ErrorAs(t, err, &unsupported)
+		assert.Equal(t, "$[1]", unsupported.Path)
+		assert.Equal(t, "channels cannot be cloned", unsupported.Reason)
+	})
+
+	t.Run("string map key", func(t *testing.T) {
+		t.Parallel()
+		type worker struct {
+			Ch chan int
+		}
+		workers := map[string]worker{
+			"main": {Ch: make(chan int)},
+		}
+
+		_, err := Clone(workers)
+		require.Error(t, err)
+
+		var unsupported *UnsupportedError
+		require.ErrorAs(t, err, &unsupported)
+		assert.Equal(t, `$["main"].Ch`, unsupported.Path)
+		assert.Equal(t, "channels cannot be cloned", unsupported.Reason)
+	})
+}
+
+func TestCloneRejectsUnsupportedUnexportedField(t *testing.T) {
+	t.Parallel()
+	type withHiddenFunc struct {
+		name   string
+		hidden func()
+	}
+
+	_, err := Clone(withHiddenFunc{name: "x", hidden: func() {}})
+	require.Error(t, err)
+
+	var unsupported *UnsupportedError
+	require.ErrorAs(t, err, &unsupported)
+	assert.Equal(t, "$.hidden", unsupported.Path)
+	assert.Equal(t, "functions cannot be cloned", unsupported.Reason)
+}
+
+func TestMustClonePanicsOnUnsupported(t *testing.T) {
+	t.Parallel()
+	ch := make(chan int)
+
+	require.Panics(t, func() {
+		MustClone(ch)
 	})
 }
 
@@ -1781,7 +1932,7 @@ func TestCloneUltraDeepNestedStruct(t *testing.T) {
 		const depth = 1000
 		original := buildDeepNested(depth)
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		// Walk both chains and verify equality and independence.
 		origCur, cloneCur := original, cloned
@@ -1819,7 +1970,7 @@ func TestCloneUltraDeepNestedStruct(t *testing.T) {
 		const depth = 10000
 		original := buildDeepNested(depth)
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		// Verify total depth by walking the chain.
 		count := 0
@@ -1850,7 +2001,7 @@ func TestCloneUltraDeepNestedStruct(t *testing.T) {
 		}
 		leaf.Child = original
 
-		cloned := Clone(original)
+		cloned := MustClone(original)
 
 		// Walk to the leaf of the clone.
 		clonedLeaf := cloned
