@@ -64,5 +64,5 @@ done
 
 ## Requirements
 
-- Go 1.26.3 or later
+- Go 1.26.4 or later
 - DeepClone library installed (`go get github.com/kaptinlin/deepclone`)

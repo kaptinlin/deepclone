@@ -2,7 +2,7 @@
 
 A high-performance deep cloning library for Go values whose state can be represented as memory-owned data.
 
-[![Go Module](https://img.shields.io/badge/go-1.26.3%2B-blue)](https://go.dev/)
+[![Go Module](https://img.shields.io/badge/go-1.26.4%2B-blue)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/deepclone)](https://goreportcard.com/report/github.com/kaptinlin/deepclone)
 
@@ -24,7 +24,7 @@ DeepClone is intentionally honest: it clones supported in-memory values, preserv
 go get github.com/kaptinlin/deepclone
 ```
 
-Requires Go 1.26.3 or later.
+Requires Go 1.26.4 or later.
 
 ## Quick Start
 
